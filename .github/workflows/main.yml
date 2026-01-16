@@ -1,0 +1,118 @@
+name: RDP4-247
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_count:
+        default: '1'
+  schedule:
+    - cron: '0 */6 * * *'
+
+jobs:
+  # --- ALPHA MACHINE ---
+  Alpha_Node:
+    runs-on: windows-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Tailscale
+        shell: powershell
+        env:
+          TS_AUTHKEY: ${{ secrets.TS_AUTHKEY }}
+        run: |
+          Invoke-WebRequest -Uri https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile ts.exe
+          Start-Process -FilePath .\ts.exe -ArgumentList "/quiet", "/norestart" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey "$env:TS_AUTHKEY" --hostname "RDP4-Alpha-${{ github.event.inputs.session_count }}" --force-reauth
+
+      - name: Configure RDP
+        shell: powershell
+        run: |
+          $Password = ConvertTo-SecureString "GithubRDP123!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $Password
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          for ($i=1; $i -le 10; $i++) {
+              $ip = (& "C:\Program Files\Tailscale\tailscale.exe" ip -4)
+              if ($ip) { echo "FINAL_IP=$ip" >> $env:GITHUB_ENV; break }
+              Start-Sleep -Seconds 5
+          }
+
+      - name: Notify & Keep-Alive (Alpha)
+        shell: bash
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
+          COUNT: ${{ github.event.inputs.session_count }}
+        run: |
+          IP="${{ env.FINAL_IP }}"
+          MSG="RDP ONLINE | REPO: RDP4 | JOB: ALPHA | S#: $COUNT | IP: $IP"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" -d "chat_id=$TELEGRAM_TO" -d "text=$MSG"
+          powershell.exe "Start-Sleep -Seconds 20000"
+
+  # --- BRAVO MACHINE ---
+  Bravo_Node:
+    runs-on: windows-latest
+    timeout-minutes: 350
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Tailscale
+        shell: powershell
+        env:
+          TS_AUTHKEY: ${{ secrets.TS_AUTHKEY }}
+        run: |
+          Invoke-WebRequest -Uri https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe -OutFile ts.exe
+          Start-Process -FilePath .\ts.exe -ArgumentList "/quiet", "/norestart" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey "$env:TS_AUTHKEY" --hostname "RDP4-Bravo-${{ github.event.inputs.session_count }}" --force-reauth
+
+      - name: Configure RDP
+        shell: powershell
+        run: |
+          $Password = ConvertTo-SecureString "GithubRDP123!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $Password
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          for ($i=1; $i -le 10; $i++) {
+              $ip = (& "C:\Program Files\Tailscale\tailscale.exe" ip -4)
+              if ($ip) { echo "FINAL_IP=$ip" >> $env:GITHUB_ENV; break }
+              Start-Sleep -Seconds 5
+          }
+
+      - name: Notify & Keep-Alive (Bravo)
+        shell: bash
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TO: ${{ secrets.TELEGRAM_TO }}
+          COUNT: ${{ github.event.inputs.session_count }}
+        run: |
+          IP="${{ env.FINAL_IP }}"
+          MSG="RDP ONLINE | REPO: RDP4 | JOB: BRAVO | S#: $COUNT | IP: $IP"
+          curl -s -X POST "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendMessage" -d "chat_id=$TELEGRAM_TO" -d "text=$MSG"
+          powershell.exe "Start-Sleep -Seconds 20000"
+
+  # --- LOOP TRIGGER & DELAYED CLEANUP ---
+  Trigger:
+    needs: [Alpha_Node, Bravo_Node]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Cleanup & Loop
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global --add safe.directory /github/workspace
+          echo "Waiting for API Sync..."
+          sleep 45
+          gh run list --workflow RDP4-247 --limit 100 --status completed --json databaseId -q '.[].databaseId' | xargs -I{} gh run delete {} || true
+          
+          NEXT=$(( ${{ github.event.inputs.session_count }} + 1 ))
+          if [ ! -f "STOP" ]; then
+            gh workflow run RDP4-247 -f session_count=$NEXT
+          fi
