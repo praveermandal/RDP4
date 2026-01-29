@@ -11,11 +11,11 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- PHOENIX TURBO CONFIG ---
+# --- PHOENIX TURBO CONFIG (SPEED BOOSTED) ---
 THREADS = 2           
-BURST_SIZE = 8        
-BURST_DELAY = 0.05    
-CYCLE_DELAY = 1.0     
+BURST_SIZE = 10       # [INCREASED] From 8 to 10 messages per burst
+BURST_DELAY = 0.03    # [FASTER] From 0.05s to 0.03s (30ms)
+CYCLE_DELAY = 0.8     # [FASTER] From 1.0s to 0.8s
 
 # ♻️ THE 5-MINUTE RULE
 LIFE_DURATION = 300   # 300 Seconds = 5 Minutes exactly
@@ -112,7 +112,7 @@ def agent_worker(agent_id, session_id, target_input, messages):
         time.sleep(2) # 2s breather before rebirth
 
 def main():
-    print(f"🚀 V18.2 PHOENIX | 5-MIN REBIRTH | {THREADS} AGENTS", flush=True)
+    print(f"🚀 V18.3 PHOENIX TURBO | 5-MIN REBIRTH | {THREADS} AGENTS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
