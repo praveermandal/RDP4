@@ -12,27 +12,24 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- PHOENIX CONFIGURATION ---
+# --- CONFIGURATION ---
 THREADS = 2           
 BURST_SIZE = 8        
-BURST_DELAY = 0.05    
 CYCLE_DELAY = 1.0     
-LIFE_DURATION = 300   # Restart browser every 5 Minutes (300s)
+LIFE_DURATION = 300   # Restart every 5 Minutes
 LOG_FILE = "message_log.txt"
 
-# GLOBAL COUNTER (Tracks total across all restarts)
+# GLOBAL COUNTER
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
 
 def log_speed(agent_id, current_life_sent, start_time):
-    """Logs speed + Global Total"""
     elapsed = time.time() - start_time
     if elapsed == 0: elapsed = 1
     speed = current_life_sent / elapsed
     
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     
-    # Read Global Total safely
     with COUNTER_LOCK:
         total = GLOBAL_SENT
         
@@ -43,14 +40,12 @@ def log_speed(agent_id, current_life_sent, start_time):
     except: pass
 
 def get_driver(agent_id):
-    """Creates a fresh, clean browser instance"""
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-    # Random temp folder ensures no cache conflicts
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_p_{agent_id}_{random.randint(1,99999)}")
     chrome_options.add_argument(f"user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/12{agent_id+5}.0.0.0 Safari/537.36")
     return webdriver.Chrome(options=chrome_options)
@@ -84,7 +79,6 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
         box_xpath = "//div[@contenteditable='true']"
         msg_box = WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.XPATH, box_xpath)))
 
-        # 5-MINUTE TIMER LOOP
         while (time.time() - start_time) < LIFE_DURATION:
             try:
                 for _ in range(BURST_SIZE):
@@ -93,19 +87,21 @@ def run_life_cycle(agent_id, session_id, target_input, messages):
                     instant_inject(driver, msg_box, f"{msg}{jitter}")
                     msg_box.send_keys(Keys.ENTER)
                     
-                    # Update Counts
                     sent_in_this_life += 1
                     with COUNTER_LOCK:
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
-                        
-                    time.sleep(BURST_DELAY)
+                    
+                    # --- RANDOMIZED DELAY (150ms to 200ms) ---
+                    # random.uniform(0.15, 0.20) generates a float like 0.174
+                    delay = random.uniform(0.15, 0.20)
+                    time.sleep(delay)
                 
                 log_speed(agent_id, sent_in_this_life, start_time)
                 time.sleep(CYCLE_DELAY)
 
             except Exception:
-                break # Restart immediately on error
+                break 
         
         print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] ⏰ Agent {agent_id}: 5 Minutes Up. Refreshing...", flush=True)
                 
@@ -124,7 +120,7 @@ def agent_worker(agent_id, session_id, target_input, messages):
         time.sleep(2)
 
 def main():
-    print(f"🔥 V18.3 PHOENIX ULTIMATE | 5-MIN REFRESH | {THREADS} THREADS", flush=True)
+    print(f"🔥 V18.4 RANDOMIZED TIMING | {THREADS} THREADS", flush=True)
     
     session_id = os.environ.get("INSTA_SESSION", "").strip()
     target_input = os.environ.get("TARGET_THREAD_ID", "").strip()
