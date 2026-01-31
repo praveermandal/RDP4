@@ -11,9 +11,8 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
 
-# --- V69 CONFIGURATION ---
+# --- V70 CONFIGURATION ---
 THREADS = 1             
 TOTAL_DURATION = 21000  
 BROWSER_LIFESPAN = 1800 
@@ -44,44 +43,45 @@ def get_driver(agent_id):
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
+def kill_popups(driver):
+    """
+    Clicks 'Not Now' on standard Instagram popups.
+    """
+    popups = [
+        "//button[text()='Not Now']",
+        "//button[contains(text(), 'Cancel')]",
+        "//div[text()='Not now']",
+        "//div[contains(@role, 'dialog')]//button[text()='Not Now']"
+    ]
+    
+    for xpath in popups:
+        try:
+            btn = driver.find_element(By.XPATH, xpath)
+            if btn.is_displayed():
+                log_status(1, "🔨 Smashing a Popup...")
+                driver.execute_script("arguments[0].click();", btn)
+                time.sleep(1)
+        except:
+            pass
+
 def human_type(driver, element, text):
-    """
-    Types one character at a time to wake up the 'Send' button.
-    """
     element.click()
-    
-    # 1. Clear existing text (just in case)
     driver.execute_script("arguments[0].value = '';", element)
-    
-    # 2. Type slowly
     for char in text:
         element.send_keys(char)
-        time.sleep(random.uniform(0.05, 0.15)) # Random speed like a human
-        
-    time.sleep(0.5) # Wait for button to turn blue
+        time.sleep(random.uniform(0.05, 0.1))
+    time.sleep(0.5)
 
 def click_send_button(driver):
-    """
-    Finds the button and verifies it is CLICKABLE.
-    """
-    # Expanded list of XPaths for the Send button
     xpaths = [
         "//div[text()='Send']",
         "//button[text()='Send']",
-        "//div[@role='button' and text()='Send']",
-        "//div[contains(@class, 'xjqpnuy')]" # Common obfuscated class
+        "//div[@role='button' and text()='Send']"
     ]
-    
     for xpath in xpaths:
         try:
             btn = driver.find_element(By.XPATH, xpath)
             if btn.is_displayed():
-                # Check if it is disabled/gray
-                if btn.get_attribute("disabled") or "opacity: 0.3" in btn.get_attribute("style"):
-                    log_status(1, "⚠️ Send button found but looks DISABLED (Gray).")
-                    return False
-                
-                # Try clicking
                 driver.execute_script("arguments[0].click();", btn)
                 return True
         except:
@@ -105,52 +105,53 @@ def run_life_cycle(agent_id, cookie, target, messages):
             
             driver.get("https://www.instagram.com/")
             WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
-            time.sleep(2)
-
-            # Cookie Strategy (No domain = safest)
+            
             clean_session = extract_session_id(cookie)
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
             
             driver.refresh()
             time.sleep(5) 
             
-            if "login" in driver.current_url:
-                log_status(agent_id, "❌ Login Failed.")
-                driver.quit()
-                return
+            # 1. KILL POPUPS (Save Login Info)
+            kill_popups(driver)
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(8)
-            log_status(agent_id, "✅ Connected.")
+            
+            # 2. KILL POPUPS AGAIN (Notifications)
+            kill_popups(driver)
+            
+            # 3. DEBUG SCREENSHOT
+            driver.save_screenshot("connected_state.png")
+            log_status(agent_id, "✅ Connected. Screenshot saved.")
 
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
 
                 try:
-                    # Find box
-                    msg_box = driver.find_element(By.XPATH, "//textarea | //div[@role='textbox'] | //div[@contenteditable='true']")
-                    msg = random.choice(messages)
+                    # Log that we are searching
+                    # log_status(agent_id, "🔍 Looking for message box...") 
                     
-                    # 1. TYPE LIKE A HUMAN (Wakes up the button)
+                    msg_box = driver.find_element(By.XPATH, "//textarea | //div[@role='textbox'] | //div[@contenteditable='true']")
+                    
+                    msg = random.choice(messages)
                     human_type(driver, msg_box, f"{msg} ")
                     
-                    # 2. CLICK THE BUTTON
                     if click_send_button(driver):
                         log_status(agent_id, f"Sent: {msg}")
                     else:
-                        log_status(agent_id, "⚠️ Failed to find active Send button. Taking screenshot.")
-                        driver.save_screenshot("debug_fail.png")
-                        
-                        # Fallback: Enter Key
+                        log_status(agent_id, "⚠️ Found box, but Send button missing.")
                         msg_box.send_keys(Keys.ENTER)
 
                 except Exception as e:
+                    # If it fails, print WHY
+                    # log_status(agent_id, f"⚠️ Loop Error (Retrying): {e}")
                     pass
                 
-                time.sleep(1.0) # Slower wait
+                time.sleep(1.5)
 
         except Exception as e:
-            log_status(agent_id, f"❌ Error: {e}")
+            log_status(agent_id, f"❌ Critical Error: {e}")
             time.sleep(10)
         
         finally:
