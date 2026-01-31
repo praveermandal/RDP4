@@ -13,7 +13,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V73 CONFIGURATION ---
+# --- V74 DESKTOP CONFIGURATION ---
 THREADS = 2             
 BASE_SPEED = 0.5        
 TOTAL_DURATION = 21300  
@@ -34,18 +34,17 @@ def get_driver(agent_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
+    # 🖥️ DESKTOP MODE (Standard Resolution)
+    chrome_options.add_argument("--window-size=1920,1080")
+    chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
+    
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
     
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
-    mobile_emulation = {
-        "deviceMetrics": { "width": 393, "height": 851, "pixelRatio": 3.0 },
-        "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
-    }
-    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    
+    # Unique Profile
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
@@ -53,30 +52,30 @@ def get_driver(agent_id):
 
 def kill_popups(driver):
     """
-    Destroys 'Turn on Notifications' and 'Save Info' modals.
+    Handles Desktop 'Turn on Notifications' modals.
     """
-    popups = [
-        "//button[text()='Not Now']",
-        "//button[contains(text(), 'Cancel')]",
-        "//div[text()='Not now']",
-        "//div[contains(@role, 'dialog')]//button[text()='Not Now']"
-    ]
-    for xpath in popups:
-        try:
-            btn = driver.find_element(By.XPATH, xpath)
-            if btn.is_displayed():
-                driver.execute_script("arguments[0].click();", btn)
-                time.sleep(0.5)
-        except:
-            pass
+    try:
+        # Click 'Not Now' on notifications
+        popups = [
+            "//button[text()='Not Now']",
+            "//button[contains(text(), 'Not Now')]",
+            "//div[@role='dialog']//button[text()='Not Now']"
+        ]
+        for xpath in popups:
+            btns = driver.find_elements(By.XPATH, xpath)
+            for btn in btns:
+                if btn.is_displayed():
+                    driver.execute_script("arguments[0].click();", btn)
+                    time.sleep(0.5)
+    except:
+        pass
 
-def find_mobile_box(driver):
-    # Added more selectors to be safe
+def find_chat_box(driver):
+    # 🖥️ DESKTOP SELECTORS
     selectors = [
-        "//textarea", 
         "//div[@role='textbox']", 
-        "//div[@contenteditable='true']",
-        "//div[contains(@placeholder, 'Message')]" 
+        "//div[@contenteditable='true']", 
+        "//div[contains(@aria-label, 'Message')]"
     ]
     for xpath in selectors:
         try: 
@@ -89,34 +88,22 @@ def react_safe_send(driver, element, text):
     try:
         element.click()
         driver.execute_script("arguments[0].value = '';", element)
-        element.send_keys(text[0])
-        element.send_keys(text[1:])
+        
+        # Type safely
+        for char in text:
+            element.send_keys(char)
+        
         time.sleep(0.1) 
         
+        # 4. FORCE UPDATE (Desktop needs this less, but safe to keep)
         driver.execute_script("""
             arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-            arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
         """, element)
-        time.sleep(0.2)
         
-        send_btn = None
-        try:
-            xpaths = ["//div[text()='Send']", "//button[text()='Send']"]
-            for xpath in xpaths:
-                btns = driver.find_elements(By.XPATH, xpath)
-                for btn in btns:
-                    if btn.is_displayed():
-                        send_btn = btn
-                        break
-                if send_btn: break
-        except: pass
-
-        if send_btn:
-            send_btn.click()
-            return True
-        else:
-            element.send_keys(Keys.ENTER)
-            return True
+        # 5. On Desktop, ENTER key is reliable
+        element.send_keys(Keys.ENTER)
+        return True
+            
     except:
         return False
 
@@ -125,6 +112,7 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
+    # 🛑 STAGGER: Agent 1 = 0s, Agent 2 = 15s
     startup_delay = (agent_id - 1) * 15
     if startup_delay > 0:
         log_status(agent_id, f"💤 Waiting {startup_delay}s...")
@@ -141,7 +129,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
         browser_start_time = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching Engine...")
+            log_status(agent_id, "🚀 Launching Desktop Engine...")
             driver = get_driver(agent_id)
             
             driver.get("https://www.instagram.com/")
@@ -151,9 +139,9 @@ def run_life_cycle(agent_id, cookie, target, messages):
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
             
             driver.refresh()
-            time.sleep(3)
+            time.sleep(5)
             
-            # 🔨 KILL LOGIN POPUPS
+            # Kill Login Popups
             kill_popups(driver)
             
             if "login" in driver.current_url:
@@ -163,27 +151,25 @@ def run_life_cycle(agent_id, cookie, target, messages):
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             
-            # 🔨 KILL NOTIFICATION POPUPS
-            time.sleep(3)
+            # Kill Notification Popups
+            time.sleep(5)
             kill_popups(driver)
 
             log_status(agent_id, "👀 Waiting for chat box...")
             try:
-                # Increased timeout to 35 seconds
-                WebDriverWait(driver, 35).until(
-                    lambda d: find_mobile_box(d) is not None
+                WebDriverWait(driver, 30).until(
+                    lambda d: find_chat_box(d) is not None
                 )
                 log_status(agent_id, "⚡ Box Found! Starting Spam.")
             except:
-                log_status(agent_id, "⚠️ Chat load timeout. Saving Screenshot...")
-                driver.save_screenshot(f"timeout_debug_agent_{agent_id}.png")
+                log_status(agent_id, "⚠️ Chat load timeout. Retrying...")
                 driver.quit()
                 continue
 
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
-                msg_box = find_mobile_box(driver)
+                msg_box = find_chat_box(driver)
                 if msg_box:
                     msg = random.choice(messages)
                     if react_safe_send(driver, msg_box, f"{msg}"):
