@@ -12,7 +12,7 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V68 STABILITY CONFIGURATION ---
+# --- V69 CONFIGURATION ---
 THREADS = 2             
 BASE_SPEED = 0.5        
 
@@ -34,7 +34,6 @@ def get_driver(agent_id):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--remote-debugging-port=9222") # Stability Flag
     
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
@@ -48,13 +47,9 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
-    # ⚠️ Unique User Data Dir is CRITICAL for multi-threading
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    })
     return driver
 
 def find_mobile_box(driver):
@@ -69,17 +64,49 @@ def find_mobile_box(driver):
 def adaptive_inject(driver, element, text):
     try:
         element.click()
+        
+        # 🛠️ THE GHOST FIX 🛠️
+        # 1. Wake up the box with a real keypress
+        element.send_keys(" ") 
+        time.sleep(0.1)
+        
+        # 2. Inject the text safely
         driver.execute_script("""
             var el = arguments[0];
-            el.focus();
-            document.execCommand('insertText', false, arguments[1]);
+            el.value = arguments[1];
+            el.innerText = arguments[1];
             el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
         """, element, text)
+        time.sleep(0.1)
         
-        try:
-            driver.find_element(By.XPATH, "//div[contains(text(), 'Send')] | //button[text()='Send']").click()
-        except:
+        # 3. Trigger one more update to turn the button BLUE
+        element.send_keys(" ") 
+        time.sleep(0.3) # Wait for button to activate
+        
+        # 4. Hunt for the Send Button
+        send_xpaths = [
+            "//div[text()='Send']",
+            "//button[text()='Send']",
+            "//div[contains(@class, 'xjqpnuy')]" # Obfuscated class
+        ]
+        
+        clicked = False
+        for xpath in send_xpaths:
+            try:
+                btn = driver.find_element(By.XPATH, xpath)
+                # Check if it's visible and clickable
+                if btn.is_displayed():
+                    driver.execute_script("arguments[0].click();", btn)
+                    clicked = True
+                    break
+            except:
+                continue
+        
+        # Fallback: Enter Key
+        if not clicked:
             element.send_keys(Keys.ENTER)
+            
         return True
     except:
         return False
@@ -89,11 +116,10 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🛑 STAGGER START: Wait based on ID to prevent CPU choke
-    # Agent 1 waits 0s, Agent 2 waits 15s
-    startup_delay = (agent_id - 1) * 15
+    # 🛑 STAGGER START (Prevents Crash)
+    startup_delay = (agent_id - 1) * 20
     if startup_delay > 0:
-        log_status(agent_id, f"💤 Waiting {startup_delay}s for clear takeoff...")
+        log_status(agent_id, f"💤 Waiting {startup_delay}s to stagger launch...")
         time.sleep(startup_delay)
 
     global_start_time = time.time()
@@ -105,8 +131,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
 
         driver = None
         browser_start_time = time.time()
-        last_page_refresh = time.time()
-        next_refresh_wait = random.randint(120, 300) 
         
         try:
             log_status(agent_id, "🚀 Launching Engine...")
@@ -122,7 +146,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
             time.sleep(5) 
             
             if "login" in driver.current_url:
-                log_status(agent_id, "❌ Login Failed. Session Invalid.")
+                log_status(agent_id, "❌ Login Failed.")
                 driver.quit()
                 break
 
@@ -133,19 +157,11 @@ def run_life_cycle(agent_id, cookie, target, messages):
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
-                # Refresh Logic
-                if (time.time() - last_page_refresh) > next_refresh_wait:
-                    log_status(agent_id, f"🔄 Refreshing Page...")
-                    driver.refresh()
-                    time.sleep(8) 
-                    last_page_refresh = time.time()
-                    next_refresh_wait = random.randint(120, 300)
-                    if "login" in driver.current_url: break 
-
                 msg_box = find_mobile_box(driver)
                 if msg_box:
                     msg = random.choice(messages)
-                    if adaptive_inject(driver, msg_box, f"{msg} "):
+                    # Use the new GHOST FIX function
+                    if adaptive_inject(driver, msg_box, f"{msg}"):
                         with COUNTER_LOCK:
                             global GLOBAL_SENT
                             GLOBAL_SENT += 1
@@ -154,9 +170,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 time.sleep(BASE_SPEED)
 
         except Exception as e:
-            # ⚠️ FULL ERROR LOGGING ENABLED
-            log_status(agent_id, f"❌ Crash Reason: {e}")
-            log_status(agent_id, "🔄 Rebooting in 2 minutes...")
+            log_status(agent_id, "🔄 Connection glitch. Rebooting...")
         
         finally:
             if driver: 
