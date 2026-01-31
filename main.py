@@ -10,13 +10,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-# --- V66 CONFIGURATION ---
+# --- V68 CONFIGURATION ---
 THREADS = 1             
-BASE_BURST = 5          
-BASE_SPEED = 0.5        
-TOTAL_DURATION = 21000  # 5.8 Hours
-BROWSER_LIFESPAN = 1800 # Restart every 30 mins
+BASE_SPEED = 0.8        
+TOTAL_DURATION = 21000  
+BROWSER_LIFESPAN = 1800 
 
 def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
@@ -47,6 +47,46 @@ def get_driver(agent_id):
     })
     return driver
 
+def brute_force_cookie(driver, session_id):
+    """
+    Tries to inject the cookie using 3 different domain strategies.
+    """
+    # Strategy 1: Automatic (Let browser decide)
+    cookie_variants = [
+        {'name': 'sessionid', 'value': session_id, 'path': '/'},
+        {'name': 'sessionid', 'value': session_id, 'path': '/', 'domain': '.instagram.com'},
+        {'name': 'sessionid', 'value': session_id, 'path': '/', 'domain': 'www.instagram.com'}
+    ]
+    
+    driver.delete_all_cookies() # Clear slate
+    
+    for i, cookie in enumerate(cookie_variants):
+        try:
+            driver.add_cookie(cookie)
+            log_status(1, f"🍪 Cookie Strategy {i+1} Success!")
+            return True
+        except Exception as e:
+            # log_status(1, f"Strategy {i+1} Failed: {e}") # Debug only
+            continue
+            
+    return False
+
+def force_send_click(driver):
+    xpaths = [
+        "//div[text()='Send']",
+        "//button[text()='Send']",
+        "//div[@role='button' and text()='Send']"
+    ]
+    for xpath in xpaths:
+        try:
+            btn = driver.find_element(By.XPATH, xpath)
+            if btn.is_displayed():
+                driver.execute_script("arguments[0].click();", btn)
+                return True
+        except:
+            continue
+    return False
+
 def adaptive_inject(driver, element, text):
     try:
         element.click()
@@ -56,12 +96,13 @@ def adaptive_inject(driver, element, text):
             document.execCommand('insertText', false, arguments[1]);
             el.dispatchEvent(new Event('input', { bubbles: true }));
         """, element, text)
-        time.sleep(0.1)
-        try:
-            driver.find_element(By.XPATH, "//div[contains(text(), 'Send')] | //button[text()='Send']").click()
-        except:
+        time.sleep(0.5)
+        
+        if force_send_click(driver):
+            return True
+        else:
             element.send_keys(Keys.ENTER)
-        return True
+            return True
     except:
         return False
 
@@ -77,59 +118,50 @@ def run_life_cycle(agent_id, cookie, target, messages):
         browser_start_time = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching Fresh Browser...")
+            log_status(agent_id, "🚀 Launching Browser...")
             driver = get_driver(agent_id)
             
-            # 1. Connection Logic
-            log_status(agent_id, "Connecting to Instagram...")
+            # 1. ROBUST CONNECTION
             driver.get("https://www.instagram.com/")
             
-            # Wait for URL to confirm we are actually there
-            WebDriverWait(driver, 15).until(
-                lambda d: "instagram.com" in d.current_url
-            )
-            time.sleep(2) # Safety buffer
+            # Wait until we are strictly on the domain
+            WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
+            time.sleep(2) 
 
-            # 2. 🛡️ FIXED COOKIE INJECTION
+            # 2. BRUTE FORCE INJECTION
             clean_session = extract_session_id(cookie)
-            
-            # NOTE: We removed 'domain': '.instagram.com'
-            # This forces Selenium to apply it to the CURRENT domain automatically.
-            driver.add_cookie({
-                'name': 'sessionid', 
-                'value': clean_session, 
-                'path': '/'
-            })
-            
-            log_status(agent_id, "🍪 Cookie Injected. Refreshing...")
+            if not brute_force_cookie(driver, clean_session):
+                log_status(agent_id, "❌ CRITICAL: All cookie strategies failed.")
+                log_status(agent_id, f"Current URL: {driver.current_url}")
+                driver.quit()
+                return
+
             driver.refresh()
             time.sleep(5) 
             
-            # 3. Check Login
+            # 3. VERIFY LOGIN
             if "login" in driver.current_url:
-                log_status(agent_id, "❌ Login Failed. Check your Session ID!")
+                log_status(agent_id, "❌ Login Failed. Session ID is invalid/expired.")
                 driver.quit()
                 return
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(8)
-            
-            log_status(agent_id, "✅ Connected. Starting Loop.")
+            log_status(agent_id, "✅ Connected.")
 
-            # Loop
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
-                if (time.time() - global_start_time) > TOTAL_DURATION:
-                    break
+                if (time.time() - global_start_time) > TOTAL_DURATION: break
 
                 try:
                     msg_box = driver.find_element(By.XPATH, "//textarea | //div[@role='textbox'] | //div[@contenteditable='true']")
+                    msg = random.choice(messages)
+                    if adaptive_inject(driver, msg_box, f"{msg} "):
+                        log_status(agent_id, f"Sent: {msg}")
+                    else:
+                        log_status(agent_id, "⚠️ Failed to send.")
+
                 except:
                     time.sleep(5)
-                    continue
-
-                msg = random.choice(messages)
-                if adaptive_inject(driver, msg_box, f"{msg} "):
-                    log_status(agent_id, f"Sent: {msg}")
                 
                 time.sleep(BASE_SPEED)
 
