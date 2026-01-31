@@ -14,11 +14,19 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- CONFIGURATION ---
-THREADS = 1             # ⚠️ Single Agent
-BASE_SPEED = 0.5        
-TOTAL_DURATION = 21600  # 6 Hours Total Run Time
-SESSION_DURATION = 120  # ♻️ 2 Minutes (Browser Restarts after this)
+# --- V81 CONFIGURATION ---
+THREADS = 1             # 👤 Single Agent
+TOTAL_DURATION = 21600  # 6 Hours
+
+# ⚡ BURST SETTINGS
+BURST_RANGE = (10, 20)      # Send 10-20 messages...
+REST_RANGE = (10, 20)       # ...then sleep 10-20 seconds.
+BURST_SPEED = (0.5, 1.2)    # Typing speed
+
+# 🔄 RESTART SETTINGS
+# The browser will be KILLED and REOPENED every 3 to 5 minutes.
+SESSION_MIN_SEC = 180       # 3 Minutes
+SESSION_MAX_SEC = 300       # 5 Minutes
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -34,27 +42,24 @@ def get_driver(agent_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
-    # 🍃 ECO-MODE: Resource Savers
-    chrome_options.add_argument("--disable-application-cache")
-    chrome_options.add_argument("--disk-cache-size=1")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-notifications")
+    # ❌ REMOVED ECO-MODE FLAGS (Standard Browser)
+    # The browser will now behave normally, caching files as needed.
     
-    # Block Images
+    # Block Images (Still good for speed)
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
     
-    # Stealth Args
+    # Stealth
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
-    # Mobile Emulation (Pixel 5)
+    # Mobile Emulation
     mobile_emulation = {
         "deviceMetrics": { "width": 393, "height": 851, "pixelRatio": 3.0 },
         "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v79_{agent_id}_{random.randint(100,999)}")
+    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v81_{agent_id}_{random.randint(100,999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     return driver
@@ -100,18 +105,17 @@ def run_life_cycle(agent_id, cookie, target, messages):
     # 🔄 OUTER LOOP: Runs for 6 Hours
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
+        
+        # Determine how long this browser lives (3-5 mins)
+        current_session_limit = random.randint(SESSION_MIN_SEC, SESSION_MAX_SEC)
         session_start = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching 2-Minute Cycle...")
+            log_status(agent_id, "🚀 Launching Standard Browser...")
             driver = get_driver(agent_id)
             
-            # Connection
-            try:
-                driver.get("https://www.instagram.com/")
-                WebDriverWait(driver, 10).until(lambda d: "instagram.com" in d.current_url)
-            except:
-                raise Exception("Connection Failed")
+            driver.get("https://www.instagram.com/")
+            WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
 
             clean_session = extract_session_id(cookie)
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
@@ -121,11 +125,15 @@ def run_life_cycle(agent_id, cookie, target, messages):
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(5)
             
-            log_status(agent_id, "✅ Connected.")
+            log_status(agent_id, "✅ Connected. Starting Burst.")
             msg_box = find_mobile_box(driver)
 
-            # ♻️ INNER LOOP: Runs for 2 Minutes (SESSION_DURATION)
-            while (time.time() - session_start) < SESSION_DURATION:
+            # ⚡ BURST TRACKERS
+            current_burst_count = 0
+            current_burst_limit = random.randint(*BURST_RANGE)
+
+            # ♻️ SESSION LOOP (Runs for 3-5 Mins)
+            while (time.time() - session_start) < current_session_limit:
                 if (time.time() - global_start) > TOTAL_DURATION: break
 
                 if not msg_box:
@@ -134,25 +142,42 @@ def run_life_cycle(agent_id, cookie, target, messages):
                         time.sleep(5)
                         continue
 
+                # --- BURST LOGIC ---
+                if current_burst_count >= current_burst_limit:
+                    rest_time = random.randint(*REST_RANGE)
+                    log_status(agent_id, f"💤 Resting {rest_time}s...")
+                    time.sleep(rest_time)
+                    
+                    # Reset
+                    current_burst_count = 0
+                    current_burst_limit = random.randint(*BURST_RANGE)
+                # -------------------
+
                 msg = random.choice(messages)
                 if adaptive_inject(driver, msg_box, f"{msg} "):
                     with COUNTER_LOCK:
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
+                    current_burst_count += 1
+                    
                     # 🔒 CLEAN LOGS
                     log_status(agent_id, "✅ Sent message")
                 
-                time.sleep(BASE_SPEED)
+                # Burst Speed
+                wait_time = random.uniform(*BURST_SPEED)
+                time.sleep(wait_time)
 
         except Exception as e:
-            log_status(agent_id, "⚠️ Connection glitch. Restarting...")
+            log_status(agent_id, "⚠️ Browser Glitch. Killing...")
         
         finally:
+            log_status(agent_id, "💀 Killing Browser (Refresh Cycle).")
             if driver: 
                 try: driver.quit()
                 except: pass
-            gc.collect() # Force RAM cleanup
-            time.sleep(2) # Quick breath
+            
+            gc.collect() 
+            time.sleep(3) # Short pause before re-opening
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE", "").strip()
