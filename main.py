@@ -11,10 +11,10 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
 
-# --- V68 CONFIGURATION ---
+# --- V69 CONFIGURATION ---
 THREADS = 1             
-BASE_SPEED = 0.8        
 TOTAL_DURATION = 21000  
 BROWSER_LIFESPAN = 1800 
 
@@ -42,69 +42,51 @@ def get_driver(agent_id):
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
     driver = webdriver.Chrome(options=chrome_options)
-    driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-        "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-    })
     return driver
 
-def brute_force_cookie(driver, session_id):
+def human_type(driver, element, text):
     """
-    Tries to inject the cookie using 3 different domain strategies.
+    Types one character at a time to wake up the 'Send' button.
     """
-    # Strategy 1: Automatic (Let browser decide)
-    cookie_variants = [
-        {'name': 'sessionid', 'value': session_id, 'path': '/'},
-        {'name': 'sessionid', 'value': session_id, 'path': '/', 'domain': '.instagram.com'},
-        {'name': 'sessionid', 'value': session_id, 'path': '/', 'domain': 'www.instagram.com'}
-    ]
+    element.click()
     
-    driver.delete_all_cookies() # Clear slate
+    # 1. Clear existing text (just in case)
+    driver.execute_script("arguments[0].value = '';", element)
     
-    for i, cookie in enumerate(cookie_variants):
-        try:
-            driver.add_cookie(cookie)
-            log_status(1, f"🍪 Cookie Strategy {i+1} Success!")
-            return True
-        except Exception as e:
-            # log_status(1, f"Strategy {i+1} Failed: {e}") # Debug only
-            continue
-            
-    return False
+    # 2. Type slowly
+    for char in text:
+        element.send_keys(char)
+        time.sleep(random.uniform(0.05, 0.15)) # Random speed like a human
+        
+    time.sleep(0.5) # Wait for button to turn blue
 
-def force_send_click(driver):
+def click_send_button(driver):
+    """
+    Finds the button and verifies it is CLICKABLE.
+    """
+    # Expanded list of XPaths for the Send button
     xpaths = [
         "//div[text()='Send']",
         "//button[text()='Send']",
-        "//div[@role='button' and text()='Send']"
+        "//div[@role='button' and text()='Send']",
+        "//div[contains(@class, 'xjqpnuy')]" # Common obfuscated class
     ]
+    
     for xpath in xpaths:
         try:
             btn = driver.find_element(By.XPATH, xpath)
             if btn.is_displayed():
+                # Check if it is disabled/gray
+                if btn.get_attribute("disabled") or "opacity: 0.3" in btn.get_attribute("style"):
+                    log_status(1, "⚠️ Send button found but looks DISABLED (Gray).")
+                    return False
+                
+                # Try clicking
                 driver.execute_script("arguments[0].click();", btn)
                 return True
         except:
             continue
     return False
-
-def adaptive_inject(driver, element, text):
-    try:
-        element.click()
-        driver.execute_script("""
-            var el = arguments[0];
-            el.focus();
-            document.execCommand('insertText', false, arguments[1]);
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-        """, element, text)
-        time.sleep(0.5)
-        
-        if force_send_click(driver):
-            return True
-        else:
-            element.send_keys(Keys.ENTER)
-            return True
-    except:
-        return False
 
 def extract_session_id(raw_cookie):
     match = re.search(r'sessionid=([^;]+)', raw_cookie)
@@ -121,27 +103,19 @@ def run_life_cycle(agent_id, cookie, target, messages):
             log_status(agent_id, "🚀 Launching Browser...")
             driver = get_driver(agent_id)
             
-            # 1. ROBUST CONNECTION
             driver.get("https://www.instagram.com/")
-            
-            # Wait until we are strictly on the domain
             WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
-            time.sleep(2) 
+            time.sleep(2)
 
-            # 2. BRUTE FORCE INJECTION
+            # Cookie Strategy (No domain = safest)
             clean_session = extract_session_id(cookie)
-            if not brute_force_cookie(driver, clean_session):
-                log_status(agent_id, "❌ CRITICAL: All cookie strategies failed.")
-                log_status(agent_id, f"Current URL: {driver.current_url}")
-                driver.quit()
-                return
-
+            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
+            
             driver.refresh()
             time.sleep(5) 
             
-            # 3. VERIFY LOGIN
             if "login" in driver.current_url:
-                log_status(agent_id, "❌ Login Failed. Session ID is invalid/expired.")
+                log_status(agent_id, "❌ Login Failed.")
                 driver.quit()
                 return
 
@@ -153,17 +127,27 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
 
                 try:
+                    # Find box
                     msg_box = driver.find_element(By.XPATH, "//textarea | //div[@role='textbox'] | //div[@contenteditable='true']")
                     msg = random.choice(messages)
-                    if adaptive_inject(driver, msg_box, f"{msg} "):
+                    
+                    # 1. TYPE LIKE A HUMAN (Wakes up the button)
+                    human_type(driver, msg_box, f"{msg} ")
+                    
+                    # 2. CLICK THE BUTTON
+                    if click_send_button(driver):
                         log_status(agent_id, f"Sent: {msg}")
                     else:
-                        log_status(agent_id, "⚠️ Failed to send.")
+                        log_status(agent_id, "⚠️ Failed to find active Send button. Taking screenshot.")
+                        driver.save_screenshot("debug_fail.png")
+                        
+                        # Fallback: Enter Key
+                        msg_box.send_keys(Keys.ENTER)
 
-                except:
-                    time.sleep(5)
+                except Exception as e:
+                    pass
                 
-                time.sleep(BASE_SPEED)
+                time.sleep(1.0) # Slower wait
 
         except Exception as e:
             log_status(agent_id, f"❌ Error: {e}")
