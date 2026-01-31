@@ -12,9 +12,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V66 DUAL AGENT CONFIGURATION ---
-THREADS = 2             # 👥 2 Agents running at once
-BASE_SPEED = 0.5        # 🐢 Normal Human Speed
+# --- V67 CONFIGURATION ---
+THREADS = 2             # 👥 2 Agents
+BASE_SPEED = 0.5        # 🐢 Safe Speed
 
 # ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
@@ -47,7 +47,7 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
-    # Unique user data dir for each agent so they don't clash
+    # ⚠️ CRITICAL: Unique user-data-dir for every thread to prevent collisions
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
@@ -98,22 +98,31 @@ def run_life_cycle(agent_id, cookie, target, messages):
         driver = None
         browser_start_time = time.time()
         
-        # 🔄 RELOAD VARIABLES
         last_page_refresh = time.time()
-        next_refresh_wait = random.randint(120, 300) # 2-5 mins
+        next_refresh_wait = random.randint(120, 300) 
         
         try:
             log_status(agent_id, "🚀 Launching Engine...")
             driver = get_driver(agent_id)
             
+            # 1. Go to Instagram
             driver.get("https://www.instagram.com/")
             WebDriverWait(driver, 20).until(lambda d: "instagram" in d.current_url)
             
+            # 2. Add Cookie (NO DOMAIN SPECIFIED = FIX)
             clean_session = extract_session_id(cookie)
-            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
+            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
+            
+            # 3. Refresh to apply cookie
             driver.refresh()
             time.sleep(3) 
             
+            # 4. Check Login
+            if "login" in driver.current_url:
+                log_status(agent_id, "❌ Login Failed. Session Invalid.")
+                driver.quit()
+                break # Stop this agent
+
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(5) 
             log_status(agent_id, "✅ Connected.")
@@ -121,19 +130,15 @@ def run_life_cycle(agent_id, cookie, target, messages):
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
-                # --- 🔄 PAGE RELOAD LOGIC ---
+                # Auto Reload Logic
                 if (time.time() - last_page_refresh) > next_refresh_wait:
                     log_status(agent_id, f"🔄 Refreshing Page...")
                     driver.refresh()
                     time.sleep(5) 
-                    
                     last_page_refresh = time.time()
                     next_refresh_wait = random.randint(120, 300)
-                    
                     if "login" in driver.current_url:
-                        log_status(agent_id, "⚠️ Logged out. Rebooting.")
                         break 
-                # ----------------------------
 
                 msg_box = find_mobile_box(driver)
                 if msg_box:
@@ -142,14 +147,13 @@ def run_life_cycle(agent_id, cookie, target, messages):
                         with COUNTER_LOCK:
                             global GLOBAL_SENT
                             GLOBAL_SENT += 1
-                        
                         log_status(agent_id, f"✅ Sent message ({GLOBAL_SENT})")
                 
                 time.sleep(BASE_SPEED)
 
         except Exception as e:
-            log_status(agent_id, f"⚠️ Error: {e}")
-            log_status(agent_id, "🔄 Rebooting...")
+            # log_status(agent_id, f"⚠️ Error: {e}") # Silent error mode
+            log_status(agent_id, "🔄 Connection drop. Rebooting...")
         
         finally:
             if driver: 
