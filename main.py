@@ -12,9 +12,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V65 RELOAD CONFIGURATION ---
-THREADS = 1             
-BASE_SPEED = 0.05       # ⚡ Fast Speed
+# --- V66 DUAL AGENT CONFIGURATION ---
+THREADS = 2             # 👥 2 Agents running at once
+BASE_SPEED = 0.5        # 🐢 Normal Human Speed
 
 # ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
@@ -26,7 +26,7 @@ COUNTER_LOCK = threading.Lock()
 
 def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"[{timestamp}] 🚀 Agent {agent_id}: {msg}", flush=True)
+    print(f"[{timestamp}] 🤖 Agent {agent_id}: {msg}", flush=True)
 
 def get_driver(agent_id):
     chrome_options = Options()
@@ -46,6 +46,9 @@ def get_driver(agent_id):
         "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+    
+    # Unique user data dir for each agent so they don't clash
+    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
@@ -97,7 +100,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
         
         # 🔄 RELOAD VARIABLES
         last_page_refresh = time.time()
-        next_refresh_wait = random.randint(120, 300) # Random 2-5 minutes
+        next_refresh_wait = random.randint(120, 300) # 2-5 mins
         
         try:
             log_status(agent_id, "🚀 Launching Engine...")
@@ -113,24 +116,22 @@ def run_life_cycle(agent_id, cookie, target, messages):
             
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(5) 
-            log_status(agent_id, "✅ Connected. Sending messages...")
+            log_status(agent_id, "✅ Connected.")
 
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
                 # --- 🔄 PAGE RELOAD LOGIC ---
                 if (time.time() - last_page_refresh) > next_refresh_wait:
-                    log_status(agent_id, f"🔄 Refreshing Page (Interval: {next_refresh_wait}s)...")
+                    log_status(agent_id, f"🔄 Refreshing Page...")
                     driver.refresh()
-                    time.sleep(5) # Wait for reload
+                    time.sleep(5) 
                     
-                    # Reset Timer
                     last_page_refresh = time.time()
-                    next_refresh_wait = random.randint(120, 300) # Pick new random time
+                    next_refresh_wait = random.randint(120, 300)
                     
-                    # Log back in if needed (rare, but safe)
                     if "login" in driver.current_url:
-                        log_status(agent_id, "⚠️ Logged out after refresh. Rebooting.")
+                        log_status(agent_id, "⚠️ Logged out. Rebooting.")
                         break 
                 # ----------------------------
 
