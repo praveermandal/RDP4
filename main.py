@@ -12,9 +12,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V67 CONFIGURATION ---
-THREADS = 2             # 👥 2 Agents
-BASE_SPEED = 0.5        # 🐢 Safe Speed
+# --- V68 STABILITY CONFIGURATION ---
+THREADS = 2             
+BASE_SPEED = 0.5        
 
 # ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
@@ -34,6 +34,7 @@ def get_driver(agent_id):
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--remote-debugging-port=9222") # Stability Flag
     
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
@@ -47,7 +48,7 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
-    # ⚠️ CRITICAL: Unique user-data-dir for every thread to prevent collisions
+    # ⚠️ Unique User Data Dir is CRITICAL for multi-threading
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
@@ -88,6 +89,13 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
+    # 🛑 STAGGER START: Wait based on ID to prevent CPU choke
+    # Agent 1 waits 0s, Agent 2 waits 15s
+    startup_delay = (agent_id - 1) * 15
+    if startup_delay > 0:
+        log_status(agent_id, f"💤 Waiting {startup_delay}s for clear takeoff...")
+        time.sleep(startup_delay)
+
     global_start_time = time.time()
     
     while True:
@@ -97,7 +105,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
 
         driver = None
         browser_start_time = time.time()
-        
         last_page_refresh = time.time()
         next_refresh_wait = random.randint(120, 300) 
         
@@ -105,40 +112,35 @@ def run_life_cycle(agent_id, cookie, target, messages):
             log_status(agent_id, "🚀 Launching Engine...")
             driver = get_driver(agent_id)
             
-            # 1. Go to Instagram
             driver.get("https://www.instagram.com/")
-            WebDriverWait(driver, 20).until(lambda d: "instagram" in d.current_url)
+            WebDriverWait(driver, 30).until(lambda d: "instagram" in d.current_url)
             
-            # 2. Add Cookie (NO DOMAIN SPECIFIED = FIX)
             clean_session = extract_session_id(cookie)
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
             
-            # 3. Refresh to apply cookie
             driver.refresh()
-            time.sleep(3) 
+            time.sleep(5) 
             
-            # 4. Check Login
             if "login" in driver.current_url:
                 log_status(agent_id, "❌ Login Failed. Session Invalid.")
                 driver.quit()
-                break # Stop this agent
+                break
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(5) 
+            time.sleep(8) 
             log_status(agent_id, "✅ Connected.")
 
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
-                # Auto Reload Logic
+                # Refresh Logic
                 if (time.time() - last_page_refresh) > next_refresh_wait:
                     log_status(agent_id, f"🔄 Refreshing Page...")
                     driver.refresh()
-                    time.sleep(5) 
+                    time.sleep(8) 
                     last_page_refresh = time.time()
                     next_refresh_wait = random.randint(120, 300)
-                    if "login" in driver.current_url:
-                        break 
+                    if "login" in driver.current_url: break 
 
                 msg_box = find_mobile_box(driver)
                 if msg_box:
@@ -152,8 +154,9 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 time.sleep(BASE_SPEED)
 
         except Exception as e:
-            # log_status(agent_id, f"⚠️ Error: {e}") # Silent error mode
-            log_status(agent_id, "🔄 Connection drop. Rebooting...")
+            # ⚠️ FULL ERROR LOGGING ENABLED
+            log_status(agent_id, f"❌ Crash Reason: {e}")
+            log_status(agent_id, "🔄 Rebooting in 2 minutes...")
         
         finally:
             if driver: 
