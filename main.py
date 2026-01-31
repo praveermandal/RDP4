@@ -13,11 +13,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V72 CONFIGURATION ---
+# --- V73 CONFIGURATION ---
 THREADS = 2             
 BASE_SPEED = 0.5        
-
-# ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
 BROWSER_LIFESPAN = 2400 
 RESTART_DELAY = 120     
@@ -48,15 +46,38 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
-    # Unique User Data
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
+def kill_popups(driver):
+    """
+    Destroys 'Turn on Notifications' and 'Save Info' modals.
+    """
+    popups = [
+        "//button[text()='Not Now']",
+        "//button[contains(text(), 'Cancel')]",
+        "//div[text()='Not now']",
+        "//div[contains(@role, 'dialog')]//button[text()='Not Now']"
+    ]
+    for xpath in popups:
+        try:
+            btn = driver.find_element(By.XPATH, xpath)
+            if btn.is_displayed():
+                driver.execute_script("arguments[0].click();", btn)
+                time.sleep(0.5)
+        except:
+            pass
+
 def find_mobile_box(driver):
-    # Expanded selectors for speed
-    selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
+    # Added more selectors to be safe
+    selectors = [
+        "//textarea", 
+        "//div[@role='textbox']", 
+        "//div[@contenteditable='true']",
+        "//div[contains(@placeholder, 'Message')]" 
+    ]
     for xpath in selectors:
         try: 
             el = driver.find_element(By.XPATH, xpath)
@@ -65,30 +86,19 @@ def find_mobile_box(driver):
     return None
 
 def react_safe_send(driver, element, text):
-    """
-    Types text and forces the Send button to activate (Turn Blue).
-    """
     try:
         element.click()
-        
-        # 1. Clear & Focus
         driver.execute_script("arguments[0].value = '';", element)
-        
-        # 2. Type first char (Wake up)
         element.send_keys(text[0])
-        
-        # 3. Type rest immediately
         element.send_keys(text[1:])
         time.sleep(0.1) 
         
-        # 4. FORCE REACT UPDATE
         driver.execute_script("""
             arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
             arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
         """, element)
         time.sleep(0.2)
         
-        # 5. Find & Click Send Button
         send_btn = None
         try:
             xpaths = ["//div[text()='Send']", "//button[text()='Send']"]
@@ -99,8 +109,7 @@ def react_safe_send(driver, element, text):
                         send_btn = btn
                         break
                 if send_btn: break
-        except:
-            pass
+        except: pass
 
         if send_btn:
             send_btn.click()
@@ -108,7 +117,6 @@ def react_safe_send(driver, element, text):
         else:
             element.send_keys(Keys.ENTER)
             return True
-            
     except:
         return False
 
@@ -117,9 +125,6 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🛑 STAGGER LOGIC
-    # Agent 1 = 0s (INSTANT)
-    # Agent 2 = 15s (Wait)
     startup_delay = (agent_id - 1) * 15
     if startup_delay > 0:
         log_status(agent_id, f"💤 Waiting {startup_delay}s...")
@@ -146,9 +151,10 @@ def run_life_cycle(agent_id, cookie, target, messages):
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
             
             driver.refresh()
-            # Agent 1 waits less time for page load
-            load_wait = 2 if agent_id == 1 else 5
-            time.sleep(load_wait) 
+            time.sleep(3)
+            
+            # 🔨 KILL LOGIN POPUPS
+            kill_popups(driver)
             
             if "login" in driver.current_url:
                 log_status(agent_id, "❌ Login Failed.")
@@ -157,21 +163,23 @@ def run_life_cycle(agent_id, cookie, target, messages):
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             
-            # ⚡ SMART WAIT (No Sleep)
-            # Instead of sleeping 8s, we wait UNTIL the box appears.
-            # This makes Agent 1 start the millisecond the chat loads.
+            # 🔨 KILL NOTIFICATION POPUPS
+            time.sleep(3)
+            kill_popups(driver)
+
             log_status(agent_id, "👀 Waiting for chat box...")
             try:
-                WebDriverWait(driver, 20).until(
+                # Increased timeout to 35 seconds
+                WebDriverWait(driver, 35).until(
                     lambda d: find_mobile_box(d) is not None
                 )
                 log_status(agent_id, "⚡ Box Found! Starting Spam.")
             except:
-                log_status(agent_id, "⚠️ Chat load timeout. Retrying...")
+                log_status(agent_id, "⚠️ Chat load timeout. Saving Screenshot...")
+                driver.save_screenshot(f"timeout_debug_agent_{agent_id}.png")
                 driver.quit()
                 continue
 
-            # --- SPAM LOOP ---
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
@@ -184,7 +192,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
                             GLOBAL_SENT += 1
                         log_status(agent_id, f"✅ Sent message ({GLOBAL_SENT})")
                 
-                # Agent 1 runs faster than Agent 2
                 current_speed = 0.3 if agent_id == 1 else BASE_SPEED
                 time.sleep(current_speed)
 
