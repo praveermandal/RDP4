@@ -5,6 +5,7 @@ import random
 import datetime
 import threading
 import sys
+import gc
 from concurrent.futures import ThreadPoolExecutor
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -13,12 +14,15 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V74 DESKTOP CONFIGURATION ---
-THREADS = 2             
+# --- V78 SINGLE AGENT CONFIGURATION ---
+THREADS = 1             # 👤 Single Agent (Maximum Safety)
 BASE_SPEED = 0.5        
-TOTAL_DURATION = 21300  
+TOTAL_DURATION = 21300  # 5 Hours 55 Minutes
+
+# ⏱️ STABILITY SETTING
+# Browser restarts every 40 minutes to keep RAM usage low.
 BROWSER_LIFESPAN = 2400 
-RESTART_DELAY = 120     
+RESTART_DELAY = 10      
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -34,7 +38,14 @@ def get_driver(agent_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
-    # 🖥️ DESKTOP MODE (Standard Resolution)
+    # 🍃 ECO-MODE
+    chrome_options.add_argument("--disable-application-cache")
+    chrome_options.add_argument("--disk-cache-size=1")
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-infobars")
+    chrome_options.add_argument("--disable-notifications")
+    
+    # 🖥️ DESKTOP MODE
     chrome_options.add_argument("--window-size=1920,1080")
     chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36")
     
@@ -44,18 +55,13 @@ def get_driver(agent_id):
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
-    # Unique Profile
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 def kill_popups(driver):
-    """
-    Handles Desktop 'Turn on Notifications' modals.
-    """
     try:
-        # Click 'Not Now' on notifications
         popups = [
             "//button[text()='Not Now']",
             "//button[contains(text(), 'Not Now')]",
@@ -71,7 +77,6 @@ def kill_popups(driver):
         pass
 
 def find_chat_box(driver):
-    # 🖥️ DESKTOP SELECTORS
     selectors = [
         "//div[@role='textbox']", 
         "//div[@contenteditable='true']", 
@@ -88,22 +93,12 @@ def react_safe_send(driver, element, text):
     try:
         element.click()
         driver.execute_script("arguments[0].value = '';", element)
-        
-        # Type safely
         for char in text:
             element.send_keys(char)
-        
         time.sleep(0.1) 
-        
-        # 4. FORCE UPDATE (Desktop needs this less, but safe to keep)
-        driver.execute_script("""
-            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-        """, element)
-        
-        # 5. On Desktop, ENTER key is reliable
+        driver.execute_script("arguments[0].dispatchEvent(new Event('input', { bubbles: true }));", element)
         element.send_keys(Keys.ENTER)
         return True
-            
     except:
         return False
 
@@ -112,17 +107,11 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🛑 STAGGER: Agent 1 = 0s, Agent 2 = 15s
-    startup_delay = (agent_id - 1) * 15
-    if startup_delay > 0:
-        log_status(agent_id, f"💤 Waiting {startup_delay}s...")
-        time.sleep(startup_delay)
-
     global_start_time = time.time()
     
     while True:
         if (time.time() - global_start_time) > TOTAL_DURATION:
-            log_status(agent_id, "✅ Shift Complete. Exiting.")
+            log_status(agent_id, "✅ Shift Complete. Exiting for restart.")
             break
 
         driver = None
@@ -137,11 +126,9 @@ def run_life_cycle(agent_id, cookie, target, messages):
             
             clean_session = extract_session_id(cookie)
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
-            
             driver.refresh()
             time.sleep(5)
             
-            # Kill Login Popups
             kill_popups(driver)
             
             if "login" in driver.current_url:
@@ -150,19 +137,15 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 break
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            
-            # Kill Notification Popups
             time.sleep(5)
             kill_popups(driver)
 
             log_status(agent_id, "👀 Waiting for chat box...")
             try:
-                WebDriverWait(driver, 30).until(
-                    lambda d: find_chat_box(d) is not None
-                )
+                WebDriverWait(driver, 30).until(lambda d: find_chat_box(d) is not None)
                 log_status(agent_id, "⚡ Box Found! Starting Spam.")
             except:
-                log_status(agent_id, "⚠️ Chat load timeout. Retrying...")
+                log_status(agent_id, "⚠️ Timeout. Retrying...")
                 driver.quit()
                 continue
 
@@ -176,18 +159,18 @@ def run_life_cycle(agent_id, cookie, target, messages):
                         with COUNTER_LOCK:
                             global GLOBAL_SENT
                             GLOBAL_SENT += 1
-                        log_status(agent_id, f"✅ Sent message ({GLOBAL_SENT})")
+                        log_status(agent_id, "✅ Sent message")
                 
-                current_speed = 0.3 if agent_id == 1 else BASE_SPEED
-                time.sleep(current_speed)
+                time.sleep(BASE_SPEED)
 
         except Exception as e:
-            log_status(agent_id, "🔄 Connection glitch. Rebooting...")
+            log_status(agent_id, "🔄 Connection drop. Rebooting...")
         
         finally:
             if driver: 
                 try: driver.quit()
                 except: pass
+            gc.collect()
             time.sleep(RESTART_DELAY)
 
 def main():
