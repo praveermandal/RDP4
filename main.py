@@ -11,20 +11,12 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V65 CONFIGURATION ---
-THREADS = 1             # Keep at 1 for safety
+# --- V66 CONFIGURATION ---
+THREADS = 1             
 BASE_BURST = 5          
 BASE_SPEED = 0.5        
-
-# ⏱️ TIME SETTINGS
-# GitHub Actions Limit is 6 Hours (21600s). We set 21000s to be safe.
-TOTAL_DURATION = 21000  
-
-# ♻️ GARBAGE COLLECTION
-# Restart Browser every 30 mins (1800s) to prevent RAM crashes
-BROWSER_LIFESPAN = 1800 
-
-GLOBAL_SENT = 0
+TOTAL_DURATION = 21000  # 5.8 Hours
+BROWSER_LIFESPAN = 1800 # Restart every 30 mins
 
 def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
@@ -37,21 +29,17 @@ def get_driver(agent_id):
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     
-    # Block Images (Speed + RAM Saver)
     prefs = {"profile.managed_default_content_settings.images": 2}
     chrome_options.add_experimental_option("prefs", prefs)
     
-    # Anti-Detection
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     
-    # Mobile Emulation
     mobile_emulation = {
         "deviceMetrics": { "width": 393, "height": 851, "pixelRatio": 3.0 },
         "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v65_{agent_id}_{random.randint(100,999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
@@ -84,43 +72,52 @@ def extract_session_id(raw_cookie):
 def run_life_cycle(agent_id, cookie, target, messages):
     global_start_time = time.time()
     
-    # 🔄 THE INFINITE LOOP (Up to 6 hours)
     while (time.time() - global_start_time) < TOTAL_DURATION:
         driver = None
         browser_start_time = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching Fresh Browser (Cycle Start)...")
+            log_status(agent_id, "🚀 Launching Fresh Browser...")
             driver = get_driver(agent_id)
             
-            # Connection Retry Logic
-            connected = False
-            for attempt in range(3):
-                try:
-                    driver.get("https://www.instagram.com/")
-                    WebDriverWait(driver, 10).until(lambda d: "instagram.com" in d.current_url)
-                    connected = True
-                    break
-                except:
-                    time.sleep(2)
+            # 1. Connection Logic
+            log_status(agent_id, "Connecting to Instagram...")
+            driver.get("https://www.instagram.com/")
             
-            if not connected:
-                raise Exception("Network Failure")
+            # Wait for URL to confirm we are actually there
+            WebDriverWait(driver, 15).until(
+                lambda d: "instagram.com" in d.current_url
+            )
+            time.sleep(2) # Safety buffer
 
-            # Login
+            # 2. 🛡️ FIXED COOKIE INJECTION
             clean_session = extract_session_id(cookie)
-            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
+            
+            # NOTE: We removed 'domain': '.instagram.com'
+            # This forces Selenium to apply it to the CURRENT domain automatically.
+            driver.add_cookie({
+                'name': 'sessionid', 
+                'value': clean_session, 
+                'path': '/'
+            })
+            
+            log_status(agent_id, "🍪 Cookie Injected. Refreshing...")
             driver.refresh()
-            time.sleep(4) 
+            time.sleep(5) 
             
-            driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(6)
-            
-            log_status(agent_id, "✅ Connected. Loop Started.")
+            # 3. Check Login
+            if "login" in driver.current_url:
+                log_status(agent_id, "❌ Login Failed. Check your Session ID!")
+                driver.quit()
+                return
 
-            # ⚡ SHORT LOOP (30 Mins max per browser)
+            driver.get(f"https://www.instagram.com/direct/t/{target}/")
+            time.sleep(8)
+            
+            log_status(agent_id, "✅ Connected. Starting Loop.")
+
+            # Loop
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
-                # Double check global time
                 if (time.time() - global_start_time) > TOTAL_DURATION:
                     break
 
@@ -138,16 +135,12 @@ def run_life_cycle(agent_id, cookie, target, messages):
 
         except Exception as e:
             log_status(agent_id, f"❌ Error: {e}")
-            time.sleep(10) # Wait before retry
+            time.sleep(10)
         
         finally:
-            # 🗑️ KILL BROWSER (Garbage Collection)
             if driver: 
-                log_status(agent_id, "♻️ Recycling Browser (Clearing RAM)...")
                 try: driver.quit()
                 except: pass
-            
-            # Short break between cycles
             time.sleep(5)
 
 def main():
