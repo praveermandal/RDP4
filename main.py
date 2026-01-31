@@ -11,10 +11,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
-# --- V70 CONFIGURATION ---
-THREADS = 2             # 👥 2 Agents
-BASE_SPEED = 0.5        # 🐢 Safe Speed
+# --- V72 CONFIGURATION ---
+THREADS = 2             
+BASE_SPEED = 0.5        
 
 # ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
@@ -47,13 +48,14 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
-    # Unique User Data Dir (Essential for running 2 agents)
+    # Unique User Data
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
 def find_mobile_box(driver):
+    # Expanded selectors for speed
     selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
     for xpath in selectors:
         try: 
@@ -62,50 +64,51 @@ def find_mobile_box(driver):
         except: continue
     return None
 
-def adaptive_inject(driver, element, text):
+def react_safe_send(driver, element, text):
+    """
+    Types text and forces the Send button to activate (Turn Blue).
+    """
     try:
         element.click()
         
-        # 1. Wake up the box (Physical Key Press)
-        element.send_keys(" ") 
-        time.sleep(0.1)
+        # 1. Clear & Focus
+        driver.execute_script("arguments[0].value = '';", element)
         
-        # 2. Inject Text Safely
+        # 2. Type first char (Wake up)
+        element.send_keys(text[0])
+        
+        # 3. Type rest immediately
+        element.send_keys(text[1:])
+        time.sleep(0.1) 
+        
+        # 4. FORCE REACT UPDATE
         driver.execute_script("""
-            var el = arguments[0];
-            el.value = arguments[1];
-            el.innerText = arguments[1];
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-        """, element, text)
-        time.sleep(0.1)
+            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
+            arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
+        """, element)
+        time.sleep(0.2)
         
-        # 3. Trigger Button Activation (Blue Color)
-        element.send_keys(" ") 
-        time.sleep(0.3) 
-        
-        # 4. Click Send
-        send_xpaths = [
-            "//div[text()='Send']",
-            "//button[text()='Send']",
-            "//div[contains(@class, 'xjqpnuy')]"
-        ]
-        
-        clicked = False
-        for xpath in send_xpaths:
-            try:
-                btn = driver.find_element(By.XPATH, xpath)
-                if btn.is_displayed():
-                    driver.execute_script("arguments[0].click();", btn)
-                    clicked = True
-                    break
-            except:
-                continue
-        
-        if not clicked:
+        # 5. Find & Click Send Button
+        send_btn = None
+        try:
+            xpaths = ["//div[text()='Send']", "//button[text()='Send']"]
+            for xpath in xpaths:
+                btns = driver.find_elements(By.XPATH, xpath)
+                for btn in btns:
+                    if btn.is_displayed():
+                        send_btn = btn
+                        break
+                if send_btn: break
+        except:
+            pass
+
+        if send_btn:
+            send_btn.click()
+            return True
+        else:
             element.send_keys(Keys.ENTER)
+            return True
             
-        return True
     except:
         return False
 
@@ -114,13 +117,12 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🛑 THE STAGGER LOGIC
-    # Agent 1 = 0s delay
-    # Agent 2 = 15s delay
+    # 🛑 STAGGER LOGIC
+    # Agent 1 = 0s (INSTANT)
+    # Agent 2 = 15s (Wait)
     startup_delay = (agent_id - 1) * 15
-    
     if startup_delay > 0:
-        log_status(agent_id, f"💤 Stagger Mode: Waiting {startup_delay}s before launch...")
+        log_status(agent_id, f"💤 Waiting {startup_delay}s...")
         time.sleep(startup_delay)
 
     global_start_time = time.time()
@@ -144,7 +146,9 @@ def run_life_cycle(agent_id, cookie, target, messages):
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/'})
             
             driver.refresh()
-            time.sleep(5) 
+            # Agent 1 waits less time for page load
+            load_wait = 2 if agent_id == 1 else 5
+            time.sleep(load_wait) 
             
             if "login" in driver.current_url:
                 log_status(agent_id, "❌ Login Failed.")
@@ -152,22 +156,37 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 break
 
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(8) 
-            log_status(agent_id, "✅ Connected.")
+            
+            # ⚡ SMART WAIT (No Sleep)
+            # Instead of sleeping 8s, we wait UNTIL the box appears.
+            # This makes Agent 1 start the millisecond the chat loads.
+            log_status(agent_id, "👀 Waiting for chat box...")
+            try:
+                WebDriverWait(driver, 20).until(
+                    lambda d: find_mobile_box(d) is not None
+                )
+                log_status(agent_id, "⚡ Box Found! Starting Spam.")
+            except:
+                log_status(agent_id, "⚠️ Chat load timeout. Retrying...")
+                driver.quit()
+                continue
 
+            # --- SPAM LOOP ---
             while (time.time() - browser_start_time) < BROWSER_LIFESPAN:
                 if (time.time() - global_start_time) > TOTAL_DURATION: break
                 
                 msg_box = find_mobile_box(driver)
                 if msg_box:
                     msg = random.choice(messages)
-                    if adaptive_inject(driver, msg_box, f"{msg}"):
+                    if react_safe_send(driver, msg_box, f"{msg}"):
                         with COUNTER_LOCK:
                             global GLOBAL_SENT
                             GLOBAL_SENT += 1
                         log_status(agent_id, f"✅ Sent message ({GLOBAL_SENT})")
                 
-                time.sleep(BASE_SPEED)
+                # Agent 1 runs faster than Agent 2
+                current_speed = 0.3 if agent_id == 1 else BASE_SPEED
+                time.sleep(current_speed)
 
         except Exception as e:
             log_status(agent_id, "🔄 Connection glitch. Rebooting...")
