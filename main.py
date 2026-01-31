@@ -12,9 +12,9 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 
-# --- V69 CONFIGURATION ---
-THREADS = 2             
-BASE_SPEED = 0.5        
+# --- V70 CONFIGURATION ---
+THREADS = 2             # 👥 2 Agents
+BASE_SPEED = 0.5        # 🐢 Safe Speed
 
 # ⏱️ LONG HAUL SETTINGS
 TOTAL_DURATION = 21300  
@@ -47,6 +47,7 @@ def get_driver(agent_id):
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
     
+    # Unique User Data Dir (Essential for running 2 agents)
     chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_agent_{agent_id}_{random.randint(1000,9999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
@@ -65,12 +66,11 @@ def adaptive_inject(driver, element, text):
     try:
         element.click()
         
-        # 🛠️ THE GHOST FIX 🛠️
-        # 1. Wake up the box with a real keypress
+        # 1. Wake up the box (Physical Key Press)
         element.send_keys(" ") 
         time.sleep(0.1)
         
-        # 2. Inject the text safely
+        # 2. Inject Text Safely
         driver.execute_script("""
             var el = arguments[0];
             el.value = arguments[1];
@@ -80,22 +80,21 @@ def adaptive_inject(driver, element, text):
         """, element, text)
         time.sleep(0.1)
         
-        # 3. Trigger one more update to turn the button BLUE
+        # 3. Trigger Button Activation (Blue Color)
         element.send_keys(" ") 
-        time.sleep(0.3) # Wait for button to activate
+        time.sleep(0.3) 
         
-        # 4. Hunt for the Send Button
+        # 4. Click Send
         send_xpaths = [
             "//div[text()='Send']",
             "//button[text()='Send']",
-            "//div[contains(@class, 'xjqpnuy')]" # Obfuscated class
+            "//div[contains(@class, 'xjqpnuy')]"
         ]
         
         clicked = False
         for xpath in send_xpaths:
             try:
                 btn = driver.find_element(By.XPATH, xpath)
-                # Check if it's visible and clickable
                 if btn.is_displayed():
                     driver.execute_script("arguments[0].click();", btn)
                     clicked = True
@@ -103,7 +102,6 @@ def adaptive_inject(driver, element, text):
             except:
                 continue
         
-        # Fallback: Enter Key
         if not clicked:
             element.send_keys(Keys.ENTER)
             
@@ -116,10 +114,13 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🛑 STAGGER START (Prevents Crash)
-    startup_delay = (agent_id - 1) * 20
+    # 🛑 THE STAGGER LOGIC
+    # Agent 1 = 0s delay
+    # Agent 2 = 15s delay
+    startup_delay = (agent_id - 1) * 15
+    
     if startup_delay > 0:
-        log_status(agent_id, f"💤 Waiting {startup_delay}s to stagger launch...")
+        log_status(agent_id, f"💤 Stagger Mode: Waiting {startup_delay}s before launch...")
         time.sleep(startup_delay)
 
     global_start_time = time.time()
@@ -160,7 +161,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 msg_box = find_mobile_box(driver)
                 if msg_box:
                     msg = random.choice(messages)
-                    # Use the new GHOST FIX function
                     if adaptive_inject(driver, msg_box, f"{msg}"):
                         with COUNTER_LOCK:
                             global GLOBAL_SENT
