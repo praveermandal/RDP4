@@ -1,11 +1,17 @@
-name: Phoenix V65 Marathon
+name: Phoenix V78 Infinite
 
 on:
   workflow_dispatch:      # Manual Start Button
   repository_dispatch:    # Auto-Restart Trigger
     types: [restart_bot]
   schedule:
-    - cron: '0 */6 * * *' # Backup Restart (Every 6 hours)
+    - cron: '0 */6 * * *' # Backup Trigger (Every 6 hours)
+
+# 🛡️ SAFETY LOCK: Prevents multiple bots from running at once
+# If a new run starts, it KILLS the old one immediately.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 permissions:
   actions: write
@@ -14,7 +20,7 @@ permissions:
 jobs:
   run-marathon:
     runs-on: ubuntu-latest
-    # ⚠️ CRITICAL: 6 Hours (360 mins). Do not lower this.
+    # ⚠️ 6 Hours (360 mins). Matches the Python script limit.
     timeout-minutes: 360  
 
     steps:
@@ -37,7 +43,7 @@ jobs:
       run: |
         pip install selenium
 
-    - name: 🔥 Run Phoenix Marathon Engine
+    - name: 🔥 Run Phoenix Engine
       id: bot_process
       continue-on-error: true  # Ensures the restart happens even if Python exits early
       env:
@@ -46,19 +52,19 @@ jobs:
         MESSAGES: ${{ secrets.MESSAGES }}
       run: python main.py
 
-    - name: 🔄 The Lazarus Protocol (Shift Change)
-      if: always()  # Runs no matter what
+    - name: 🔄 The Lazarus Protocol (Auto-Restart)
+      if: always()  # Runs no matter what happens above
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "⚠️ 6-Hour Marathon Finished. Handing over to next agent..."
+        echo "⚠️ 6-Hour Shift Finished. Handing over to next agent..."
         
-        # 🛡️ SAFETY BUFFER: Wait 2 minutes (120s) before starting the next shift
+        # 🛡️ SAFETY BUFFER: Wait 2 minutes (120s) before starting next shift
+        # This prevents GitHub from flagging "Rapid Fire" workflows.
         echo "💤 Cooling down for 120 seconds..."
         sleep 120
         
         # 🔄 DYNAMIC RESTART
-        # Triggers THIS same workflow again to create an infinite loop
         echo "🔄 Fetching current workflow ID..."
         WORKFLOW_ID=$(gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId')
         
