@@ -1,25 +1,20 @@
-name: Phoenix V83 Loop
+name: Phoenix V95 Stable Stealth
 
 on:
-  workflow_dispatch:      # Manual Start
-  repository_dispatch:    # Auto-Restart
+  workflow_dispatch:
+  repository_dispatch:
     types: [restart_bot]
   schedule:
-    - cron: '0 */6 * * *' # Backup every 6 hours
+    - cron: '0 */6 * * *'
 
-# 🛡️ SAFETY LOCK: Single instance only
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
 
-permissions:
-  actions: write
-  contents: read
-
 jobs:
   run-loop:
-    runs-on: ubuntu-latest
-    timeout-minutes: 360  # 6 Hours
+    runs-on: windows-latest
+    timeout-minutes: 360
 
     steps:
     - name: Checkout Code
@@ -30,21 +25,16 @@ jobs:
       with:
         python-version: '3.9'
 
-    - name: Install Google Chrome
-      run: |
-        wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list'
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-
     - name: Install Dependencies
       run: |
-        pip install selenium
+        # 👇 SWITCHED TO SELENIUM-STEALTH (STABLE)
+        pip install selenium selenium-stealth
 
-    - name: 🔥 Run Phoenix Engine
+    - name: 🔥 Run Phoenix Engine (V95)
       id: bot_process
-      continue-on-error: true
+      continue-on-error: false
       env:
+        PYTHONIOENCODING: utf-8
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
         TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
         MESSAGES: ${{ secrets.MESSAGES }}
@@ -53,12 +43,11 @@ jobs:
     - name: 🔄 Auto-Restart Logic
       if: always()
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
       run: |
-        echo "⚠️ 6-Hour Shift Finished. Preparing next cycle..."
-        # 2 Minute Safety Cool-down
-        sleep 120
+        echo "⚠️ Shift Finished. Preparing next cycle..."
+        start-sleep -s 120 
         
         echo "🔄 Restarting Workflow..."
-        WORKFLOW_ID=$(gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId')
+        $WORKFLOW_ID = gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId'
         gh workflow run $WORKFLOW_ID
