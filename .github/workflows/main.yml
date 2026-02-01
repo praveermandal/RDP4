@@ -1,11 +1,11 @@
-name: Phoenix V95 (God Mode)
+name: Phoenix V95 (Standard Engine)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *' # ⚠️ Runs every 4 hours.
+    - cron: '0 */4 * * *' # ⚠️ Starts a new bot every 4 hours
 
-# 🔥 AUTO-KILL: Kills the previous 4-hour job when the new one starts.
+# 🔥 OVERLAP STRATEGY: Kills the old bot when the new one starts
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -13,7 +13,7 @@ concurrency:
 jobs:
   run-loop:
     runs-on: windows-latest
-    timeout-minutes: 350 # 5 Hours 50 Min (Safeguard)
+    timeout-minutes: 350 # 5 Hours 50 Min (Longer than 4 hours)
 
     steps:
     - name: Checkout Code
@@ -28,7 +28,7 @@ jobs:
       run: |
         pip install selenium selenium-stealth
 
-    - name: 🔥 Run Phoenix Engine (Indestructible)
+    - name: 🔥 Run Phoenix Engine (Indestructible Loop)
       env:
         PYTHONIOENCODING: utf-8
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
@@ -36,17 +36,17 @@ jobs:
         MESSAGES: ${{ secrets.MESSAGES }}
       run: |
         # Infinite PowerShell Loop
-        # If Python crashes, this restarts it instantly.
+        # If the script crashes or closes, this restarts it immediately.
         while ($true) {
-          Write-Host "🚀 Starting Phoenix Engine..."
+          Write-Host "🚀 Starting Standard Engine..."
           try {
-            # Run the bot and wait for it to finish/crash
+            # Execute the Python script
             & python main.py
           } catch {
             Write-Host "❌ Script crashed internally."
           }
           
-          # If we get here, the bot stopped. Wait 10s and restart.
+          # If main.py exits, wait 10s and restart
           Write-Host "⚠️ Crash/Exit Detected. Respawning in 10 seconds..."
           Start-Sleep -s 10
         }
