@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # --- V95 REBORN CONFIGURATION ---
-THREADS = 2             # ✅ 2 AGENTS (Dual Core)
+THREADS = 1             # ✅ 2 AGENTS (Dual Core)
 TOTAL_DURATION = 21600  
 
 # ⚡ SPEED (Safe for 2 Agents)
