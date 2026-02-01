@@ -1,12 +1,12 @@
-name: Phoenix V100 (God Mode)
+name: Phoenix V95 Stable Stealth
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [restart_bot]
   schedule:
-    - cron: '0 */4 * * *' # ⚠️ Starts every 4 hours
+    - cron: '0 */6 * * *'
 
-# 🔥 AUTO-KILL STRATEGY
-# Kills the old bot when the new one starts.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   run-loop:
     runs-on: windows-latest
-    timeout-minutes: 350 # 5 Hours 50 Min
+    timeout-minutes: 360
 
     steps:
     - name: Checkout Code
@@ -27,25 +27,27 @@ jobs:
 
     - name: Install Dependencies
       run: |
+        # 👇 SWITCHED TO SELENIUM-STEALTH (STABLE)
         pip install selenium selenium-stealth
 
-    - name: 🔥 Run Phoenix Engine (V100 Turbo)
+    - name: 🔥 Run Phoenix Engine (V95)
+      id: bot_process
+      continue-on-error: false
       env:
         PYTHONIOENCODING: utf-8
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
         TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
         MESSAGES: ${{ secrets.MESSAGES }}
+      run: python main.py
+
+    - name: 🔄 Auto-Restart Logic
+      if: always()
+      env:
+        GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
       run: |
-        # Infinite PowerShell Loop
-        # If Python crashes, this restarts it instantly.
-        while ($true) {
-          Write-Host "🚀 Starting V100 Turbo Engine..."
-          try {
-            & python main.py
-          } catch {
-            Write-Host "❌ Script crashed internally."
-          }
-          
-          Write-Host "⚠️ Crash/Exit Detected. Respawning in 10 seconds..."
-          Start-Sleep -s 10
-        }
+        echo "⚠️ Shift Finished. Preparing next cycle..."
+        start-sleep -s 120 
+        
+        echo "🔄 Restarting Workflow..."
+        $WORKFLOW_ID = gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId'
+        gh workflow run $WORKFLOW_ID
