@@ -1,53 +1,15 @@
-name: Phoenix V95 Reborn (Dual Atom)
-
-on:
-  workflow_dispatch:
-  repository_dispatch:
-    types: [restart_bot]
-  schedule:
-    - cron: '0 */6 * * *' # Runs every 6 hours
-
-concurrency:
-  group: ${{ github.workflow }}
-  cancel-in-progress: true
-
-jobs:
-  run-loop:
-    runs-on: windows-latest
-    timeout-minutes: 360 # 6 Hours Max
-
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-
-    - name: Install Dependencies
-      run: |
-        pip install selenium selenium-stealth
-
-    - name: 🔥 Run Phoenix Engine (Dual Atom)
-      id: bot_process
-      continue-on-error: false
+- name: 🔄 Auto-Restart Logic
+      if: always()
       env:
-        PYTHONIOENCODING: utf-8
-        # Make sure these secrets are set in your Repo Settings!
-        INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
-        TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        MESSAGES: ${{ secrets.MESSAGES }}
-      run: python main.py
-
-    - name: 🔄 Auto-Restart Logic
-      if: always() # Runs even if the script crashes or times out
-      env:
-        GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
+        # ⚠️ CRITICAL CHANGE: Map your secret to GITHUB_TOKEN
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
       run: |
         echo "⚠️ Shift Finished. Preparing next cycle..."
         start-sleep -s 120 
         
         echo "🔄 Restarting Workflow..."
+        # Get the Workflow ID dynamically
         $WORKFLOW_ID = gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId'
+        
+        # Run it using the mapped token
         gh workflow run $WORKFLOW_ID
