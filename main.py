@@ -14,17 +14,18 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V89 CONFIGURATION ---
+# --- V87 CONFIGURATION ---
 THREADS = 1             # ⚠️ Single Agent
 TOTAL_DURATION = 21600  # 6 Hours
 
-# ⚡ RAPID FIRE SETTINGS (0.1s - 0.3s)
-BURST_SPEED = (0.1, 0.3)    
+# ⚡ HYPER SPEED SETTINGS
+# 0.1s to 0.4s delay. This is extremely fast.
+BURST_SPEED = (0.1, 0.4)    
 
 # 🔄 RESTART SETTINGS
-# Restart every 3-5 minutes to handle the high volume of messages.
-SESSION_MIN_SEC = 180       # 3 Minutes
-SESSION_MAX_SEC = 300       # 5 Minutes
+# Optimized for Speed: Restart every 2-4 minutes to keep RAM fresh.
+SESSION_MIN_SEC = 120       # 2 Minutes
+SESSION_MAX_SEC = 240       # 4 Minutes
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -60,7 +61,7 @@ def get_driver(agent_id):
         "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
     }
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v89_{agent_id}_{random.randint(100,999)}")
+    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v87_{agent_id}_{random.randint(100,999)}")
     
     driver = webdriver.Chrome(options=chrome_options)
     return driver
@@ -86,7 +87,7 @@ def adaptive_inject(driver, element, text):
             el.dispatchEvent(new Event('change', { bubbles: true }));
         """, element, text)
         
-        # Tiny safety sleep
+        # Reduced safety sleep for speed
         time.sleep(0.05) 
         
         try:
@@ -110,11 +111,12 @@ def run_life_cycle(agent_id, cookie, target, messages):
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
         
+        # Short Session for Speed (2-4 Mins)
         current_session_limit = random.randint(SESSION_MIN_SEC, SESSION_MAX_SEC)
         session_start = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching Rapid Fire Cycle...")
+            log_status(agent_id, "🚀 Launching Hyper-Speed Cycle...")
             driver = get_driver(agent_id)
             
             driver.get("https://www.instagram.com/")
@@ -128,7 +130,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
             time.sleep(4)
             
-            log_status(agent_id, "✅ Connected. STARTING RAPID FIRE.")
+            log_status(agent_id, "✅ Connected. FIRE AT WILL.")
             msg_box = find_mobile_box(driver)
 
             # ♻️ INNER SESSION LOOP
@@ -149,7 +151,7 @@ def run_life_cycle(agent_id, cookie, target, messages):
                     
                     log_status(agent_id, "✅ Sent message")
                 
-                # RAPID FIRE WAIT (0.1 - 0.3s)
+                # HYPER SPEED WAIT
                 wait_time = random.uniform(*BURST_SPEED)
                 time.sleep(wait_time)
 
