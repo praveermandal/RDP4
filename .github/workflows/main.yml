@@ -39,16 +39,16 @@ jobs:
         MESSAGES: ${{ secrets.MESSAGES }}
       run: python main.py
 
-    - name: 🔄 Auto-Restart Logic
+    - name: 🔄 Auto-Restart Logic (CURL Method)
       if: always()
-      env:
-        # ⚠️ FIXED: Mapped explicitly to GITHUB_TOKEN so 'gh' command finds it
-        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
       run: |
         echo "⚠️ Shift Finished. Preparing next cycle..."
-        start-sleep -s 120 
+        start-sleep -s 120
         
-        echo "🔄 Restarting Workflow..."
-        # We explicitly pass the token to the command to be 100% safe
-        $WORKFLOW_ID = gh run view ${{ github.run_id }} --json workflowDatabaseId --jq '.workflowDatabaseId'
-        gh workflow run $WORKFLOW_ID
+        echo "🔄 Triggering Dispatch Event..."
+        
+        # ⚠️ We use CURL to manually hit the GitHub API
+        curl -X POST -H "Accept: application/vnd.github.v3+json" `
+             -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" `
+             https://api.github.com/repos/${{ github.repository }}/dispatches `
+             -d '{\"event_type\":\"restart_bot\"}'
