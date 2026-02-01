@@ -1,6 +1,5 @@
 import os
 import time
-import re
 import random
 import datetime
 import threading
@@ -18,9 +17,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 
-# --- V95 PASSIVE CONFIGURATION ---
-THREADS = 2             # ✅ Dual Agent
-TOTAL_DURATION = 25000  # ⚠️ 7 HOURS (Guarantees Overlap with Schedule)
+# --- V95 STANDARD CONFIGURATION ---
+THREADS = 2             # ✅ 2 Agents
+TOTAL_DURATION = 25000  # ⚠️ 7 Hours (Guarantees Overlap)
 
 # ⚡ SPEED SETTINGS
 BURST_SPEED = (0.2, 0.5) 
@@ -31,7 +30,6 @@ GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
 BROWSER_LAUNCH_LOCK = threading.Lock()
 
-# Force UTF-8 Output
 sys.stdout.reconfigure(encoding='utf-8')
 
 def log_status(agent_id, msg):
@@ -43,41 +41,27 @@ def get_driver(agent_id):
         time.sleep(2) 
         chrome_options = Options()
         
-        # ⚡ PERFORMANCE & STEALTH
-        chrome_options.page_load_strategy = 'eager'
+        # ⚡ STANDARD ENGINE (Reverted Atom Features)
+        chrome_options.page_load_strategy = 'normal' # Switched back to normal for stability
         chrome_options.add_argument("--headless=new") 
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--renderer-process-limit=1")
-        chrome_options.add_argument("--js-flags=--max_old_space_size=128")
-        chrome_options.add_argument("--disk-cache-size=1") 
-        chrome_options.add_argument("--media-cache-size=1") 
         
-        # 🚫 BLOCK ASSETS (Saves RAM)
-        prefs = {
-            "profile.managed_default_content_settings.images": 2,
-            "profile.managed_default_content_settings.stylesheets": 2,
-            "profile.managed_default_content_settings.fonts": 2,
-            "profile.managed_default_content_settings.cookies": 1,
-        }
-        chrome_options.add_experimental_option("prefs", prefs)
-        
-        # 📱 MOBILE SPOOFING
+        # 📱 MOBILE SPOOFING (Still Required)
         mobile_emulation = {
             "deviceMetrics": { "width": 360, "height": 800, "pixelRatio": 3.0 },
             "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
         }
         chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
         
-        # 📁 ISOLATED TEMP FOLDER
-        custom_temp_dir = os.path.join(tempfile.gettempdir(), f"passive_v95_{agent_id}_{int(time.time())}")
+        # 📁 TEMP FOLDER
+        custom_temp_dir = os.path.join(tempfile.gettempdir(), f"standard_v95_{agent_id}_{int(time.time())}")
         chrome_options.add_argument(f"--user-data-dir={custom_temp_dir}")
 
         driver = webdriver.Chrome(options=chrome_options)
 
-        # 🧬 CDP INJECTION (Verification Bypass)
+        # 🧬 CDP INJECTION
         driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
             "source": """
                 Object.defineProperty(navigator, 'platform', {get: () => 'Linux armv8l'});
@@ -106,11 +90,9 @@ def find_mobile_box(driver):
 
 def adaptive_inject(driver, element, text):
     try:
-        # 🛡️ GHOSTBUSTER NOISE (Anti-Spam)
         noise = random.randint(1000, 9999)
         final_text = f"{text} " 
         
-        # ⚡ JS INJECTION
         driver.execute_script("""
             var el = arguments[0];
             el.focus();
@@ -120,7 +102,6 @@ def adaptive_inject(driver, element, text):
         
         time.sleep(0.05) 
         
-        # ⚡ BLIND CLICK
         try:
             driver.execute_script("document.querySelector('div[role=button]').click();")
         except:
@@ -146,7 +127,6 @@ def inject_full_cookies(driver, raw_cookie_string):
     except: return False
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # Stagger start to save CPU
     if agent_id == 2:
         time.sleep(60)
 
@@ -159,19 +139,18 @@ def run_life_cycle(agent_id, cookie, target, messages):
         session_start = time.time()
         
         try:
-            log_status(agent_id, "[START] Launching...")
+            log_status(agent_id, "[START] Launching Standard Browser...")
             driver = get_driver(agent_id)
             temp_path = getattr(driver, 'custom_temp_path', None)
             
             driver.get("https://www.instagram.com/")
             inject_full_cookies(driver, cookie)
             driver.refresh()
-            time.sleep(random.uniform(3, 5)) 
+            time.sleep(random.uniform(5, 8)) # Longer wait for standard load
             
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(4)
+            time.sleep(5)
             
-            # Popup Killer
             try: driver.execute_script("document.querySelector('button._a9--').click()")
             except: pass
             
@@ -207,7 +186,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
                 try: driver.quit()
                 except: pass
             
-            # 🧹 DELETE TEMP FILES
             if temp_path and os.path.exists(temp_path):
                 try: shutil.rmtree(temp_path, ignore_errors=True)
                 except: pass
@@ -221,10 +199,8 @@ def main():
     messages = os.environ.get("MESSAGES", "Hello").split("|")
     
     if len(cookie) < 5:
-        print("[FATAL] Cookie Missing")
         sys.exit(1)
     
-    # 🧹 STARTUP CLEAN: Kill any old stuck Chrome processes
     try: subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except: pass
 
