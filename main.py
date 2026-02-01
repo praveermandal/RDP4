@@ -7,6 +7,8 @@ import threading
 import sys
 import gc
 import tempfile
+import subprocess
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 # 📦 STANDARD SELENIUM + STEALTH
@@ -18,18 +20,18 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V100 CONFIGURATION (DUAL TURBO) ---
-THREADS = 2             
-TOTAL_DURATION = 21600  # 6 Hours
+# --- V95 REBORN CONFIGURATION ---
+THREADS = 2             # ✅ 2 AGENTS (Dual Core)
+TOTAL_DURATION = 21600  
 
-# ⚡ HYPER SPEED
-# Delays removed. Pure speed.
-BURST_SPEED = (0.1, 0.3) 
+# ⚡ SPEED (Safe for 2 Agents)
+# We use a slightly safer speed to ensure both agents don't jam the CPU.
+BURST_SPEED = (0.2, 0.5) 
 
-# ♻️ RESTART CYCLES (RAM SAVER)
-# Restarts browser every 5 to 10 minutes to prevent lag.
-SESSION_MIN_SEC = 300   # 5 Mins
-SESSION_MAX_SEC = 600   # 10 Mins
+# ♻️ INDIVIDUAL RESPAWN CYCLES
+# Each agent will self-destruct and respawn independently every 3-5 mins.
+SESSION_MIN_SEC = 180   
+SESSION_MAX_SEC = 300   
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -43,69 +45,93 @@ def log_status(agent_id, msg):
     print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
 def get_driver(agent_id):
-    # 🔒 Launch Lock: Prevents CPU spike by launching agents one by one
+    # 🔒 Launch Lock: Agents take turns starting up to save CPU
     with BROWSER_LAUNCH_LOCK:
         time.sleep(2) 
         chrome_options = Options()
         
-        # 📉 ULTRA LITE WINDOWS FLAGS
+        # ⚡ ATOM CORE (V110 Tech)
+        chrome_options.page_load_strategy = 'eager'
+        chrome_options.add_argument("--headless=new") 
+        
+        # 📉 STRIPPED FLAGS
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--renderer-process-limit=2")
         chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-notifications")
-        chrome_options.add_argument("--disable-popup-blocking")
+        chrome_options.add_argument("--renderer-process-limit=1")
+        chrome_options.add_argument("--js-flags=--max_old_space_size=128")
+        chrome_options.add_argument("--disk-cache-size=1") 
+        chrome_options.add_argument("--media-cache-size=1") 
         
-        # MOBILE EMULATION (iPhone X Mode)
+        # 🚫 BLOCK ASSETS
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.managed_default_content_settings.stylesheets": 2,
+            "profile.managed_default_content_settings.fonts": 2,
+            "profile.managed_default_content_settings.cookies": 1,
+            "profile.managed_default_content_settings.media_stream": 2,
+        }
+        chrome_options.add_experimental_option("prefs", prefs)
+        
+        # 📱 MOBILE EMULATION
         mobile_emulation = {
-            "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
+            "deviceMetrics": { "width": 360, "height": 800, "pixelRatio": 3.0 },
             "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
         }
         chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
         
-        # Random Temp Folder (Prevents cache conflicts)
-        temp_dir = os.path.join(tempfile.gettempdir(), f"st_v100_{agent_id}_{random.randint(100,999)}")
-        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+        # 📁 ISOLATED TEMP PROFILE (Vital for 2 Agents)
+        # We create a unique folder so Agent 1 doesn't delete Agent 2's data
+        custom_temp_dir = os.path.join(tempfile.gettempdir(), f"atom_v95_{agent_id}_{int(time.time())}")
+        chrome_options.add_argument(f"--user-data-dir={custom_temp_dir}")
 
         driver = webdriver.Chrome(options=chrome_options)
 
-        # 🪄 APPLY STEALTH
+        # 🧬 CDP INJECTION
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+            "source": """
+                Object.defineProperty(navigator, 'platform', {get: () => 'Linux armv8l'});
+                Object.defineProperty(navigator, 'maxTouchPoints', {get: () => 5});
+            """
+        })
+
         stealth(driver,
             languages=["en-US", "en"],
             vendor="Google Inc.",
-            platform="Win32",
-            webgl_vendor="Intel Inc.",
-            renderer="Intel Iris OpenGL Engine",
+            platform="Linux armv8l",
+            webgl_vendor="ARM",
+            renderer="Mali-G76",
             fix_hairline=True,
         )
         
-    return driver
+        # Tag the driver with its folder so we can delete it later
+        driver.custom_temp_path = custom_temp_dir
+        return driver
 
 def find_mobile_box(driver):
-    # Fast Selector (No waiting)
-    selectors = ["//textarea", "//div[@role='textbox']"]
-    for xpath in selectors:
-        try: 
-            el = driver.find_element(By.XPATH, xpath)
-            return el
-        except: continue
+    try: return driver.find_element(By.XPATH, "//textarea")
+    except: pass
+    try: return driver.find_element(By.XPATH, "//div[@role='textbox']")
+    except: pass
     return None
 
 def adaptive_inject(driver, element, text):
     try:
-        # ⚡ JS INJECTION (INSTANT TYPE)
-        driver.execute_script("arguments[0].click();", element)
+        # 🛡️ GHOSTBUSTER INJECTION (V110 Tech)
+        noise = random.randint(1000, 9999)
+        final_text = f"{text} " # Simple space is usually enough for bulk
+
         driver.execute_script("""
             var el = arguments[0];
+            el.focus();
             document.execCommand('insertText', false, arguments[1]);
             el.dispatchEvent(new Event('input', { bubbles: true }));
-        """, element, text)
+        """, element, final_text)
         
-        # Zero Sleep for max speed
+        time.sleep(0.05) 
         
         try:
-            # ⚡ JS CLICK (INSTANT SEND)
             btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Send')] | //button[text()='Send']")
             driver.execute_script("arguments[0].click();", btn)
         except:
@@ -114,49 +140,55 @@ def adaptive_inject(driver, element, text):
     except:
         return False
 
-def extract_session_id(raw_cookie):
-    match = re.search(r'sessionid=([^;]+)', raw_cookie)
-    return match.group(1).strip() if match else raw_cookie.strip()
+def inject_full_cookies(driver, raw_cookie_string):
+    try:
+        cookie_parts = raw_cookie_string.split(';')
+        for part in cookie_parts:
+            if '=' in part:
+                name, value = part.strip().split('=', 1)
+                try:
+                    driver.add_cookie({
+                        'name': name.strip(), 
+                        'value': value.strip(), 
+                        'path': '/', 
+                        'domain': '.instagram.com'
+                    })
+                except: pass
+        return True
+    except: return False
 
 def run_life_cycle(agent_id, cookie, target, messages):
-    # 🕒 STAGGER: Agent 2 waits 45s to let Agent 1 stabilize RAM
+    # 🕒 STAGGER: Agent 2 waits 60s so they don't respawn at the same time
     if agent_id == 2:
-        log_status(agent_id, "[WAIT] Holding 45s for Agent 1...")
-        time.sleep(45)
+        log_status(agent_id, "[WAIT] Staggering start by 60s...")
+        time.sleep(60)
 
     global_start = time.time()
 
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
+        temp_path = None
         current_session_limit = random.randint(SESSION_MIN_SEC, SESSION_MAX_SEC)
         session_start = time.time()
         
         try:
-            log_status(agent_id, "[START] Launching Browser...")
+            log_status(agent_id, "[START] Launching Atom Browser...")
             driver = get_driver(agent_id)
-            
-            driver.get("https://www.google.com")
+            temp_path = getattr(driver, 'custom_temp_path', None)
             
             driver.get("https://www.instagram.com/")
-            WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
-
-            clean_session = extract_session_id(cookie)
-            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
+            inject_full_cookies(driver, cookie)
             driver.refresh()
-            time.sleep(random.uniform(4, 6)) 
+            time.sleep(random.uniform(3, 5)) 
             
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(5)
+            time.sleep(4)
             
-            # 📢 AGENT 1 OPENING SHOUT
-            if agent_id == 1:
-                log_status(agent_id, "📢 Sending Activation Ping...")
-                try:
-                    box = find_mobile_box(driver)
-                    if box: adaptive_inject(driver, box, "Bot Active! 🚀 ")
-                except: pass
-
-            log_status(agent_id, "[SUCCESS] Connected. Starting Turbo Loop.")
+            # Popup Killer
+            try: driver.execute_script("document.querySelector('button._a9--').click()")
+            except: pass
+            
+            log_status(agent_id, "[SUCCESS] Connected.")
             msg_box = find_mobile_box(driver)
 
             while (time.time() - session_start) < current_session_limit:
@@ -175,7 +207,6 @@ def run_life_cycle(agent_id, cookie, target, messages):
                         GLOBAL_SENT += 1
                     log_status(agent_id, "[SENT] Message delivered")
                 
-                # ⚡ HYPER SPEED DELAY
                 wait_time = random.uniform(*BURST_SPEED)
                 time.sleep(wait_time)
 
@@ -184,12 +215,19 @@ def run_life_cycle(agent_id, cookie, target, messages):
             log_status(agent_id, f"[ERROR] Glitch: {err_msg[:50]}...")
         
         finally:
-            log_status(agent_id, "[CLEAN] Recycling RAM...")
+            log_status(agent_id, "[CLEAN] Self-Destructing Session...")
             if driver: 
                 try: driver.quit()
                 except: pass
+            
+            # 🧹 SURGICAL CLEANUP
+            # Only deletes THIS agent's temp folder
+            if temp_path and os.path.exists(temp_path):
+                try: shutil.rmtree(temp_path, ignore_errors=True)
+                except: pass
+            
             gc.collect() 
-            time.sleep(3) 
+            time.sleep(5) # Brief cool-down before respawn
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE", "").strip()
@@ -199,6 +237,11 @@ def main():
     if len(cookie) < 5:
         print("[FATAL] Cookie error.")
         sys.exit(1)
+    
+    # Initial kill of any old processes
+    try:
+        subprocess.run("taskkill /F /IM chrome.exe /T", shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except: pass
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
         for i in range(THREADS):
