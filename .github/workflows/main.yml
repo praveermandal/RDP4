@@ -1,11 +1,11 @@
-name: Phoenix V95 Stable Stealth
+name: Phoenix V95 Reborn (Dual Atom)
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [restart_bot]
   schedule:
-    - cron: '0 */6 * * *'
+    - cron: '0 */6 * * *' # Runs every 6 hours
 
 concurrency:
   group: ${{ github.workflow }}
@@ -14,7 +14,7 @@ concurrency:
 jobs:
   run-loop:
     runs-on: windows-latest
-    timeout-minutes: 360
+    timeout-minutes: 360 # 6 Hours Max
 
     steps:
     - name: Checkout Code
@@ -27,21 +27,21 @@ jobs:
 
     - name: Install Dependencies
       run: |
-        # 👇 SWITCHED TO SELENIUM-STEALTH (STABLE)
         pip install selenium selenium-stealth
 
-    - name: 🔥 Run Phoenix Engine (V95)
+    - name: 🔥 Run Phoenix Engine (Dual Atom)
       id: bot_process
       continue-on-error: false
       env:
         PYTHONIOENCODING: utf-8
+        # Make sure these secrets are set in your Repo Settings!
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
         TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
         MESSAGES: ${{ secrets.MESSAGES }}
       run: python main.py
 
     - name: 🔄 Auto-Restart Logic
-      if: always()
+      if: always() # Runs even if the script crashes or times out
       env:
         GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }} 
       run: |
