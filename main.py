@@ -6,94 +6,108 @@ import datetime
 import threading
 import sys
 import gc
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
+
+# 📦 STANDARD SELENIUM + STEALTH
 from selenium import webdriver
+from selenium_stealth import stealth
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# --- V87 CONFIGURATION ---
-THREADS = 1             # ⚠️ Single Agent
+# --- V100 CONFIGURATION (DUAL TURBO) ---
+THREADS = 2             
 TOTAL_DURATION = 21600  # 6 Hours
 
-# ⚡ HYPER SPEED SETTINGS
-# 0.1s to 0.4s delay. This is extremely fast.
-BURST_SPEED = (0.1, 0.4)    
+# ⚡ HYPER SPEED
+# Delays removed. Pure speed.
+BURST_SPEED = (0.1, 0.3) 
 
-# 🔄 RESTART SETTINGS
-# Optimized for Speed: Restart every 2-4 minutes to keep RAM fresh.
-SESSION_MIN_SEC = 120       # 2 Minutes
-SESSION_MAX_SEC = 240       # 4 Minutes
+# ♻️ RESTART CYCLES (RAM SAVER)
+# Restarts browser every 5 to 10 minutes to prevent lag.
+SESSION_MIN_SEC = 300   # 5 Mins
+SESSION_MAX_SEC = 600   # 10 Mins
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
+BROWSER_LAUNCH_LOCK = threading.Lock()
+
+# Force UTF-8
+sys.stdout.reconfigure(encoding='utf-8')
 
 def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"[{timestamp}] 🤖 Agent {agent_id}: {msg}", flush=True)
+    print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
 def get_driver(agent_id):
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    
-    # 🍃 RESOURCE SAVER
-    chrome_options.add_argument("--disable-application-cache")
-    chrome_options.add_argument("--disk-cache-size=1")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-notifications")
-    
-    # Block Images
-    prefs = {"profile.managed_default_content_settings.images": 2}
-    chrome_options.add_experimental_option("prefs", prefs)
-    
-    # Stealth
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-    
-    # Mobile Emulation
-    mobile_emulation = {
-        "deviceMetrics": { "width": 393, "height": 851, "pixelRatio": 3.0 },
-        "userAgent": "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Mobile Safari/537.36"
-    }
-    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    chrome_options.add_argument(f"--user-data-dir=/tmp/chrome_v87_{agent_id}_{random.randint(100,999)}")
-    
-    driver = webdriver.Chrome(options=chrome_options)
+    # 🔒 Launch Lock: Prevents CPU spike by launching agents one by one
+    with BROWSER_LAUNCH_LOCK:
+        time.sleep(2) 
+        chrome_options = Options()
+        
+        # 📉 ULTRA LITE WINDOWS FLAGS
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--renderer-process-limit=2")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-notifications")
+        chrome_options.add_argument("--disable-popup-blocking")
+        
+        # MOBILE EMULATION (iPhone X Mode)
+        mobile_emulation = {
+            "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
+            "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+        }
+        chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+        
+        # Random Temp Folder (Prevents cache conflicts)
+        temp_dir = os.path.join(tempfile.gettempdir(), f"st_v100_{agent_id}_{random.randint(100,999)}")
+        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+
+        driver = webdriver.Chrome(options=chrome_options)
+
+        # 🪄 APPLY STEALTH
+        stealth(driver,
+            languages=["en-US", "en"],
+            vendor="Google Inc.",
+            platform="Win32",
+            webgl_vendor="Intel Inc.",
+            renderer="Intel Iris OpenGL Engine",
+            fix_hairline=True,
+        )
+        
     return driver
 
 def find_mobile_box(driver):
-    selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
+    # Fast Selector (No waiting)
+    selectors = ["//textarea", "//div[@role='textbox']"]
     for xpath in selectors:
         try: 
             el = driver.find_element(By.XPATH, xpath)
-            if el.is_displayed(): return el
+            return el
         except: continue
     return None
 
 def adaptive_inject(driver, element, text):
     try:
-        element.click()
-        # Direct Injection
+        # ⚡ JS INJECTION (INSTANT TYPE)
+        driver.execute_script("arguments[0].click();", element)
         driver.execute_script("""
             var el = arguments[0];
-            el.focus();
             document.execCommand('insertText', false, arguments[1]);
             el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
         """, element, text)
         
-        # Reduced safety sleep for speed
-        time.sleep(0.05) 
+        # Zero Sleep for max speed
         
         try:
-            # Try clicking send immediately
+            # ⚡ JS CLICK (INSTANT SEND)
             btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Send')] | //button[text()='Send']")
-            btn.click()
+            driver.execute_script("arguments[0].click();", btn)
         except:
             element.send_keys(Keys.ENTER)
         return True
@@ -105,19 +119,23 @@ def extract_session_id(raw_cookie):
     return match.group(1).strip() if match else raw_cookie.strip()
 
 def run_life_cycle(agent_id, cookie, target, messages):
+    # 🕒 STAGGER: Agent 2 waits 45s to let Agent 1 stabilize RAM
+    if agent_id == 2:
+        log_status(agent_id, "[WAIT] Holding 45s for Agent 1...")
+        time.sleep(45)
+
     global_start = time.time()
 
-    # 🔄 OUTER LOOP: Runs for 6 Hours
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
-        
-        # Short Session for Speed (2-4 Mins)
         current_session_limit = random.randint(SESSION_MIN_SEC, SESSION_MAX_SEC)
         session_start = time.time()
         
         try:
-            log_status(agent_id, "🚀 Launching Hyper-Speed Cycle...")
+            log_status(agent_id, "[START] Launching Browser...")
             driver = get_driver(agent_id)
+            
+            driver.get("https://www.google.com")
             
             driver.get("https://www.instagram.com/")
             WebDriverWait(driver, 20).until(lambda d: "instagram.com" in d.current_url)
@@ -125,22 +143,29 @@ def run_life_cycle(agent_id, cookie, target, messages):
             clean_session = extract_session_id(cookie)
             driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
             driver.refresh()
-            time.sleep(3) 
+            time.sleep(random.uniform(4, 6)) 
             
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(4)
+            time.sleep(5)
             
-            log_status(agent_id, "✅ Connected. FIRE AT WILL.")
+            # 📢 AGENT 1 OPENING SHOUT
+            if agent_id == 1:
+                log_status(agent_id, "📢 Sending Activation Ping...")
+                try:
+                    box = find_mobile_box(driver)
+                    if box: adaptive_inject(driver, box, "Bot Active! 🚀 ")
+                except: pass
+
+            log_status(agent_id, "[SUCCESS] Connected. Starting Turbo Loop.")
             msg_box = find_mobile_box(driver)
 
-            # ♻️ INNER SESSION LOOP
             while (time.time() - session_start) < current_session_limit:
                 if (time.time() - global_start) > TOTAL_DURATION: break
 
                 if not msg_box:
                     msg_box = find_mobile_box(driver)
                     if not msg_box:
-                        time.sleep(2)
+                        time.sleep(1)
                         continue
 
                 msg = random.choice(messages)
@@ -148,22 +173,21 @@ def run_life_cycle(agent_id, cookie, target, messages):
                     with COUNTER_LOCK:
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
-                    
-                    log_status(agent_id, "✅ Sent message")
+                    log_status(agent_id, "[SENT] Message delivered")
                 
-                # HYPER SPEED WAIT
+                # ⚡ HYPER SPEED DELAY
                 wait_time = random.uniform(*BURST_SPEED)
                 time.sleep(wait_time)
 
         except Exception as e:
-            log_status(agent_id, "⚠️ Glitch. Rebooting...")
+            err_msg = str(e).encode('ascii', 'ignore').decode('ascii')
+            log_status(agent_id, f"[ERROR] Glitch: {err_msg[:50]}...")
         
         finally:
-            log_status(agent_id, "💀 Session Complete. Restarting Browser...")
+            log_status(agent_id, "[CLEAN] Recycling RAM...")
             if driver: 
                 try: driver.quit()
                 except: pass
-            
             gc.collect() 
             time.sleep(3) 
 
@@ -172,7 +196,9 @@ def main():
     target = os.environ.get("TARGET_THREAD_ID", "").strip()
     messages = os.environ.get("MESSAGES", "Hello").split("|")
     
-    if not cookie: sys.exit(1)
+    if len(cookie) < 5:
+        print("[FATAL] Cookie error.")
+        sys.exit(1)
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
         for i in range(THREADS):
