@@ -20,7 +20,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # --- V100 CONFIGURATION (DUAL TURBO) ---
 THREADS = 2             
-TOTAL_DURATION = 25000  # ⚠️ CHANGED: Increased to 7 Hours for God Mode Overlap
+TOTAL_DURATION = 21600  # 6 Hours
 
 # ⚡ HYPER SPEED
 # Delays removed. Pure speed.
