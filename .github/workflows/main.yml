@@ -1,12 +1,11 @@
-name: Phoenix V95 Reborn (Dual Atom)
+name: Phoenix V95 (God Mode)
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [restart_bot]
   schedule:
-    - cron: '0 */6 * * *' # Runs every 6 hours
+    - cron: '0 */4 * * *' # ⚠️ Runs every 4 hours.
 
+# 🔥 AUTO-KILL: Kills the previous 4-hour job when the new one starts.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: true
@@ -14,7 +13,7 @@ concurrency:
 jobs:
   run-loop:
     runs-on: windows-latest
-    timeout-minutes: 360 # 6 Hours Max
+    timeout-minutes: 350 # 5 Hours 50 Min (Safeguard)
 
     steps:
     - name: Checkout Code
@@ -29,26 +28,25 @@ jobs:
       run: |
         pip install selenium selenium-stealth
 
-    - name: 🔥 Run Phoenix Engine (Dual Atom)
-      id: bot_process
-      continue-on-error: false
+    - name: 🔥 Run Phoenix Engine (Indestructible)
       env:
         PYTHONIOENCODING: utf-8
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
         TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
         MESSAGES: ${{ secrets.MESSAGES }}
-      run: python main.py
-
-    - name: 🔄 Auto-Restart Logic (CURL Method)
-      if: always()
       run: |
-        echo "⚠️ Shift Finished. Preparing next cycle..."
-        start-sleep -s 120
-        
-        echo "🔄 Triggering Dispatch Event..."
-        
-        # ⚠️ We use CURL to manually hit the GitHub API
-        curl -X POST -H "Accept: application/vnd.github.v3+json" `
-             -H "Authorization: token ${{ secrets.PERSONAL_TOKEN }}" `
-             https://api.github.com/repos/${{ github.repository }}/dispatches `
-             -d '{\"event_type\":\"restart_bot\"}'
+        # Infinite PowerShell Loop
+        # If Python crashes, this restarts it instantly.
+        while ($true) {
+          Write-Host "🚀 Starting Phoenix Engine..."
+          try {
+            # Run the bot and wait for it to finish/crash
+            & python main.py
+          } catch {
+            Write-Host "❌ Script crashed internally."
+          }
+          
+          # If we get here, the bot stopped. Wait 10s and restart.
+          Write-Host "⚠️ Crash/Exit Detected. Respawning in 10 seconds..."
+          Start-Sleep -s 10
+        }
