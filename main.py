@@ -21,7 +21,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # --- V100 SINGLE AGENT CONFIGURATION ---
-THREADS = 1             # ✅ Single Agent (Max Efficiency)
+THREADS = 2             # ✅ Single Agent (Max Efficiency)
 TOTAL_DURATION = 25000  # 7 Hours
 
 # ⚡ HYPER SPEED
@@ -29,8 +29,8 @@ BURST_SPEED = (0.1, 0.3)
 
 # ♻️ RESTART CYCLES (10 Minutes)
 # Longer cycles = Less startup time = More messages
-SESSION_MIN_SEC = 600   # 600 Seconds = 10 Minutes
-SESSION_MAX_SEC = 600   # Fixed
+SESSION_MIN_SEC = 400   # 600 Seconds = 10 Minutes
+SESSION_MAX_SEC = 400   # Fixed
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
