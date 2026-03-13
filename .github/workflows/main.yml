@@ -3,7 +3,7 @@ name: Phoenix V100 (Linux Dual-Turbo)
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */6 * * *'
 
 concurrency:
   # We add the runner index to the group name so they don't cancel each other!
