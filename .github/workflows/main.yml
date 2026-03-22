@@ -31,9 +31,10 @@ jobs:
       env:
         INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
         TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        MESSAGES: ${{ secrets.MESSAGES }}
+        TARGET_NAME: ${{ secrets.TARGET_NAME }}
         MACHINE_INDEX: ${{ matrix.machine-id }}
       run: |
+        python main.py
         while true; do
           python -u main.py
           echo "⚠️ Engine Exit. Respawning in 5s..."
