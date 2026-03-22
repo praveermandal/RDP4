@@ -11,32 +11,30 @@ import subprocess
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 
-# 📦 STANDARD SELENIUM + STEALTH
+# 📦 SELENIUM & DRIVER TOOLS
 from selenium import webdriver
 from selenium_stealth import stealth
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
-# --- V100 SINGLE AGENT CONFIGURATION ---
-THREADS = 2             # ✅ double Agent
-TOTAL_DURATION = 25000  # 7 Hours
+# --- V100 TUNED CONFIGURATION ---
+THREADS = 2             # 2 Agents per machine (10 Agents Total)
+TOTAL_DURATION = 25000  # ~7 Hours
 
-# ⚡ HYPER SPEED
-BURST_SPEED = (0.1, 0.3) 
+# ⚡ TARGET SPEED: 80ms - 100ms
+BURST_MIN = 0.08
+BURST_MAX = 0.10
 
 # ♻️ RESTART CYCLES (2 Minutes)
-# ⚠️ 120 Seconds = 2 Minutes
-SESSION_MIN_SEC = 120   
-SESSION_MAX_SEC = 120   
+SESSION_MAX_SEC = 120    
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
 BROWSER_LAUNCH_LOCK = threading.Lock()
 
-# Force UTF-8
 sys.stdout.reconfigure(encoding='utf-8')
 
 def log_status(agent_id, msg):
@@ -47,29 +45,23 @@ def get_driver(agent_id):
     with BROWSER_LAUNCH_LOCK:
         time.sleep(2) 
         chrome_options = Options()
-        
-        # 🐧 LINUX OPTIMIZATIONS
         chrome_options.add_argument("--headless=new") 
         chrome_options.add_argument("--no-sandbox") 
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--renderer-process-limit=2")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-notifications")
         
-        # MOBILE EMULATION (iPhone X Mode)
         mobile_emulation = {
             "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
             "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
         }
         chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
         
-        temp_dir = os.path.join(tempfile.gettempdir(), f"linux_v100_single_{int(time.time())}")
+        temp_dir = os.path.join(tempfile.gettempdir(), f"v100_{agent_id}_{int(time.time())}")
         chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
-        driver = webdriver.Chrome(options=chrome_options)
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # 🪄 APPLY STEALTH
         stealth(driver,
             languages=["en-US", "en"],
             vendor="Google Inc.",
@@ -78,124 +70,68 @@ def get_driver(agent_id):
             renderer="Mali-G76",
             fix_hairline=True,
         )
-        
         driver.custom_temp_path = temp_dir
         return driver
 
 def find_mobile_box(driver):
-    selectors = ["//textarea", "//div[@role='textbox']"]
+    selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
     for xpath in selectors:
         try: 
-            el = driver.find_element(By.XPATH, xpath)
-            return el
+            return driver.find_element(By.XPATH, xpath)
         except: continue
     return None
 
 def adaptive_inject(driver, element, text):
     try:
-        driver.execute_script("arguments[0].click();", element)
-        driver.execute_script("""
-            var el = arguments[0];
-            document.execCommand('insertText', false, arguments[1]);
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-        """, element, text)
-        
-        try:
-            btn = driver.find_element(By.XPATH, "//div[contains(text(), 'Send')] | //button[text()='Send']")
-            driver.execute_script("arguments[0].click();", btn)
-        except:
-            element.send_keys(Keys.ENTER)
+        driver.execute_script("arguments[0].focus();", element)
+        driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
+        element.send_keys(Keys.ENTER)
         return True
-    except:
-        return False
-
-def extract_session_id(raw_cookie):
-    match = re.search(r'sessionid=([^;]+)', raw_cookie)
-    return match.group(1).strip() if match else raw_cookie.strip()
+    except: return False
 
 def run_life_cycle(agent_id, cookie, target, messages):
     global_start = time.time()
-
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
-        temp_path = None
-        
-        # ⚠️ FIXED 2 MINUTE SESSION
-        current_session_limit = 120 
         session_start = time.time()
-        
         try:
-            log_status(agent_id, "[START] Launching Browser...")
+            log_status(agent_id, "🚀 Launching Browser...")
             driver = get_driver(agent_id)
-            temp_path = getattr(driver, 'custom_temp_path', None)
-            
-            driver.get("https://www.google.com")
             driver.get("https://www.instagram.com/")
-            time.sleep(2) 
-
-            clean_session = extract_session_id(cookie)
-            driver.add_cookie({'name': 'sessionid', 'value': clean_session, 'path': '/', 'domain': '.instagram.com'})
-            driver.refresh()
-            time.sleep(random.uniform(3, 5)) 
             
+            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
+            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             driver.get(f"https://www.instagram.com/direct/t/{target}/")
-            time.sleep(4) # Reduced wait slightly for speed
-            
-            log_status(agent_id, "📢 Sending Activation Ping...")
-            try:
-                box = find_mobile_box(driver)
-                if box: adaptive_inject(driver, box, "Bot Active! 🚀 ")
-            except: pass
+            time.sleep(5)
 
-            log_status(agent_id, "[SUCCESS] Connected.")
             msg_box = find_mobile_box(driver)
-
-            while (time.time() - session_start) < current_session_limit:
+            
+            # --- THE FIRING LOOP ---
+            while (time.time() - session_start) < SESSION_MAX_SEC:
                 if (time.time() - global_start) > TOTAL_DURATION: break
-
-                if not msg_box:
-                    msg_box = find_mobile_box(driver)
-                    if not msg_box:
-                        time.sleep(1)
-                        continue
-
+                
                 msg = random.choice(messages)
-                if adaptive_inject(driver, msg_box, f"{msg} "):
+                if adaptive_inject(driver, msg_box, f"{msg} {random.randint(10,99)}"):
                     with COUNTER_LOCK:
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
-                    log_status(agent_id, "[SENT] Message delivered")
                 
-                wait_time = random.uniform(*BURST_SPEED)
-                time.sleep(wait_time)
-
-        except Exception as e:
-            err_msg = str(e).encode('ascii', 'ignore').decode('ascii')
-            log_status(agent_id, f"[ERROR] Glitch: {err_msg[:50]}...")
-        
+                # ⚡ 80ms - 100ms Pulse
+                time.sleep(random.uniform(BURST_MIN, BURST_MAX))
+        except: pass
         finally:
-            log_status(agent_id, "[CLEAN] ♻️ 2 Minute Restart...")
-            if driver: 
-                try: driver.quit()
-                except: pass
-            
-            if temp_path and os.path.exists(temp_path):
-                try: shutil.rmtree(temp_path, ignore_errors=True)
-                except: pass
-            
-            gc.collect() 
-            time.sleep(3) 
+            log_status(agent_id, "♻️ 2-Minute Restart & RAM Flush")
+            if driver: driver.quit()
+            gc.collect()
 
 def main():
-    cookie = os.environ.get("INSTA_COOKIE", "").strip()
-    target = os.environ.get("TARGET_THREAD_ID", "").strip()
-    messages = os.environ.get("MESSAGES", "Hello").split("|")
+    cookie = os.environ.get("INSTA_COOKIE", "")
+    target = os.environ.get("TARGET_THREAD_ID", "")
+    messages = os.environ.get("MESSAGES", "Strike").split("|")
     
-    if len(cookie) < 5:
-        sys.exit(1)
-
-    try: subprocess.run("pkill -f chrome", shell=True)
-    except: pass
+    if not cookie or not target:
+        print("❌ Missing Secrets!")
+        return
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
         for i in range(THREADS):
