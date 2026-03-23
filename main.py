@@ -19,59 +19,56 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- V102 TUNED CONFIGURATION ---
-THREADS = 2             # 2 Browsers
-TABS_PER_AGENT = 3      # 3 Tabs per Browser (Total 6 Streams)
+# --- V102.1 TUNED CONFIGURATION ---
+TABS_PER_AGENT = 3      # 3 Simultaneous Streams
 TOTAL_DURATION = 25000  
 
-# ⚡ TARGET SPEED
-BURST_MIN = 0.05        # Dropped to 50ms for maximum fire
+# ⚡ TARGET SPEED (50ms - 80ms)
+BURST_MIN = 0.05
 BURST_MAX = 0.08
 
-# ♻️ RESTART CYCLES
+# ♻️ RESTART CYCLES (2 Minutes)
 SESSION_MAX_SEC = 120    
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
-BROWSER_LAUNCH_LOCK = threading.Lock()
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-def log_status(agent_id, msg):
+def log_status(msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
+    print(f"[{timestamp}] [Agent 1]: {msg}", flush=True)
 
-def get_driver(agent_id):
-    with BROWSER_LAUNCH_LOCK:
-        time.sleep(1) 
-        chrome_options = Options()
-        chrome_options.add_argument("--headless=new") 
-        chrome_options.add_argument("--no-sandbox") 
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--disable-renderer-backgrounding")
-        
-        mobile_emulation = {
-            "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
-            "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-        }
-        chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-        
-        temp_dir = os.path.join(tempfile.gettempdir(), f"v102_{agent_id}_{int(time.time())}")
-        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+def get_driver():
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new") 
+    chrome_options.add_argument("--no-sandbox") 
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-renderer-backgrounding")
+    chrome_options.add_argument("--blink-settings=imagesEnabled=false")
+    
+    mobile_emulation = {
+        "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+    }
+    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+    
+    temp_dir = os.path.join(tempfile.gettempdir(), f"v102_single_{int(time.time())}")
+    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        stealth(driver,
-            languages=["en-US", "en"],
-            vendor="Google Inc.",
-            platform="Linux armv8l", 
-            webgl_vendor="ARM",
-            renderer="Mali-G76",
-            fix_hairline=True,
-        )
-        return driver
+    stealth(driver,
+        languages=["en-US", "en"],
+        vendor="Google Inc.",
+        platform="Linux armv8l", 
+        webgl_vendor="ARM",
+        renderer="Mali-G76",
+        fix_hairline=True,
+    )
+    return driver
 
 def find_mobile_box(driver):
     selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
@@ -99,49 +96,58 @@ def get_dynamic_block(target_name):
     block = "\n".join([line for _ in range(20)])
     return f"{block}\n⚡ ID: {random.randint(1000, 9999)}"
 
-def tab_striker(driver, handle, agent_id, target_name, session_start, global_start):
-    """Internal loop for each tab to fire independently."""
-    driver.switch_to.window(handle)
-    msg_box = find_mobile_box(driver)
-    
-    while (time.time() - session_start) < SESSION_MAX_SEC:
-        if (time.time() - global_start) > TOTAL_DURATION: break
-        if msg_box:
-            final_text = get_dynamic_block(target_name)
-            adaptive_inject(driver, msg_box, final_text)
-        time.sleep(random.uniform(BURST_MIN, BURST_MAX))
+def tab_striker(driver, handle, target_name, session_start, global_start):
+    """Firing loop for individual tabs."""
+    try:
+        driver.switch_to.window(handle)
+        # Give tab a moment to load elements
+        time.sleep(5) 
+        msg_box = find_mobile_box(driver)
+        
+        while (time.time() - session_start) < SESSION_MAX_SEC:
+            if (time.time() - global_start) > TOTAL_DURATION: break
+            if msg_box:
+                final_text = get_dynamic_block(target_name)
+                adaptive_inject(driver, msg_box, final_text)
+                with COUNTER_LOCK:
+                    global GLOBAL_SENT
+                    GLOBAL_SENT += 1
+            time.sleep(random.uniform(BURST_MIN, BURST_MAX))
+    except Exception:
+        pass
 
-def run_life_cycle(agent_id, cookie, target_id, target_name):
+def run_life_cycle(cookie, target_id, target_name):
     global_start = time.time()
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
         session_start = time.time()
         try:
-            log_status(agent_id, "🚀 Launching Multi-Stream Browser...")
-            driver = get_driver(agent_id)
+            log_status("🚀 Launching Fresh Agent (Single Browser)...")
+            driver = get_driver()
             driver.get("https://www.instagram.com/")
             
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # --- PARALLEL TAB LAUNCH ---
+            log_status(f"🌐 Opening {TABS_PER_AGENT} Simultaneous Streams...")
             for _ in range(TABS_PER_AGENT):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
-                time.sleep(3) # Ultra-fast stagger
+                time.sleep(4) 
 
             handles = driver.window_handles[1:]
             
-            # Use ThreadPool to fire from all tabs at the same time
+            # 🔥 Parallel Firing across 3 tabs
             with ThreadPoolExecutor(max_workers=TABS_PER_AGENT) as tab_executor:
                 for h in handles:
-                    tab_executor.submit(tab_striker, driver, h, agent_id, target_name, session_start, global_start)
+                    tab_executor.submit(tab_striker, driver, h, target_name, session_start, global_start)
                 
         except Exception as e:
-            log_status(agent_id, f"⚠️ Error: {e}")
+            log_status(f"⚠️ Runtime Error: {e}")
         finally:
-            log_status(agent_id, "♻️ RAM Flush & Reboot")
+            log_status("♻️ NUCLEAR PURGE: Resetting session and clearing RAM...")
             if driver: driver.quit()
             gc.collect()
+            time.sleep(5)
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE", "")
@@ -152,9 +158,7 @@ def main():
         print("❌ Missing Secrets!")
         return
 
-    with ThreadPoolExecutor(max_workers=THREADS) as executor:
-        for i in range(THREADS):
-            executor.submit(run_life_cycle, i+1, cookie, target_id, target_name)
+    run_life_cycle(cookie, target_id, target_name)
 
 if __name__ == "__main__":
     main()
