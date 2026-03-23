@@ -17,13 +17,15 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # --- 🔥 ULTRA-SPEED V100 CONFIGURATION ---
-THREADS = 3             # 3 Agents per machine
-TOTAL_DURATION = 25000  # ~7 Hours
-BURST_MIN = 0.03        # 30ms
-BURST_MAX = 0.05        # 50ms
-SESSION_MAX_SEC = 180   # 3 Minute Cycles
+THREADS = 3             
+TOTAL_DURATION = 25000  
+BURST_MIN = 0.04        # Slightly increased to 40ms to ensure stability
+BURST_MAX = 0.06        
+SESSION_MAX_SEC = 180   
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -68,31 +70,39 @@ def get_driver(agent_id):
         return driver
 
 def find_mobile_box(driver):
-    selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
+    """Aggressive search for the Instagram DM input box."""
+    selectors = [
+        "//textarea[@placeholder='Message...']",
+        "//div[@role='textbox']",
+        "//textarea",
+        "//div[@contenteditable='true']",
+        "//div[contains(@class, 'xat24cr')]" # New common IG class
+    ]
     for xpath in selectors:
-        try: return driver.find_element(By.XPATH, xpath)
+        try: 
+            element = WebDriverWait(driver, 3).until(EC.presence_of_element_status((By.XPATH, xpath)))
+            if element.is_displayed():
+                return element
         except: continue
     return None
 
 def adaptive_inject(driver, element, text):
     try:
+        # Use JS to force focus and insert text instantly
         driver.execute_script("arguments[0].focus();", element)
         driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
+        time.sleep(0.01)
         element.send_keys(Keys.ENTER)
         return True
-    except: return False
+    except Exception as e:
+        return False
 
 def get_dynamic_block(target_name):
-    """Generates a 20-line block with rotating emoji and fixed underlines."""
     emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"]
     selected_emoji = random.choice(emojis)
-    
-    # Standard underline length for Instagram Mobile alignment
     underlines = "________________________" 
-    
     line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji} {underlines}/"
     block = "\n".join([line for _ in range(20)])
-    
     return f"{block}\n⚡ ID: {random.randint(100000, 999999)}"
 
 def run_life_cycle(agent_id, cookie, target_id, target_name):
@@ -101,17 +111,24 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
         driver = None
         session_start = time.time()
         try:
-            log_status(agent_id, "🚀 Launching Agent...")
+            log_status(agent_id, "🚀 Launching Heavy Agent...")
             driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+            
+            # Go directly to the chat
             driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-            time.sleep(4) 
+            time.sleep(7) # Increased load time for GitHub's network speed
 
             msg_box = find_mobile_box(driver)
             
+            if not msg_box:
+                log_status(agent_id, "❌ Could not find text box. Retrying session...")
+                driver.quit()
+                continue
+
             while (time.time() - session_start) < SESSION_MAX_SEC:
                 if (time.time() - global_start) > TOTAL_DURATION: break
                 
@@ -121,6 +138,8 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
                     with COUNTER_LOCK:
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
+                        if GLOBAL_SENT % 10 == 0:
+                            print(f"📈 Total Sent: {GLOBAL_SENT}", flush=True)
                 
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
