@@ -13,25 +13,20 @@ from concurrent.futures import ThreadPoolExecutor
 from selenium import webdriver
 from selenium_stealth import stealth
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🚀 STABLE HIGH-SPEED CONFIGURATION ---
-THREADS = 3             # 3 Agents per machine (15 Total in 5-Machine Matrix)
+# --- 🚀 ENGINE CONFIGURATION ---
+THREADS = 3             # 3 Machines in the matrix
 TOTAL_DURATION = 25000  
 
-# ⚡ TARGET SPEED: 20ms - 40ms 
-BURST_MIN = 0.02
-BURST_MAX = 0.04
-
-# ♻️ RESTART CYCLES
-SESSION_MAX_SEC = 180    
+# ⚡ JS PULSE SPEED (Milliseconds)
+# 30ms is the "Sweet Spot" for bypass
+JS_DELAY = 30 
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
-BROWSER_LAUNCH_LOCK = threading.Lock()
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -40,106 +35,90 @@ def log_status(agent_id, msg):
     print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
 def get_driver(agent_id):
-    with BROWSER_LAUNCH_LOCK:
-        time.sleep(1) 
-        chrome_options = Options()
-        chrome_options.add_argument("--headless=new") 
-        chrome_options.add_argument("--no-sandbox") 
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-        
-        mobile_emulation = {
-            "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
-            "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
-        }
-        chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-        
-        temp_dir = os.path.join(tempfile.gettempdir(), f"v100_{agent_id}_{int(time.time())}")
-        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-
-        stealth(driver,
-            languages=["en-US", "en"],
-            vendor="Google Inc.",
-            platform="Linux armv8l", 
-            webgl_vendor="ARM",
-            renderer="Mali-G76",
-            fix_hairline=True,
-        )
-        return driver
-
-def find_mobile_box(driver):
-    selectors = [
-        "//textarea[@placeholder='Message...']",
-        "//div[@role='textbox']",
-        "//textarea",
-        "//div[@contenteditable='true']"
-    ]
-    for xpath in selectors:
-        try: 
-            return driver.find_element(By.XPATH, xpath)
-        except: continue
-    return None
-
-def adaptive_inject(driver, element, text):
-    try:
-        driver.execute_script("arguments[0].focus();", element)
-        driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
-        element.send_keys(Keys.ENTER)
-        return True
-    except: return False
-
-def get_dynamic_block(target_name):
-    emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"]
-    selected_emoji = random.choice(emojis)
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=new") 
+    chrome_options.add_argument("--no-sandbox") 
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--blink-settings=imagesEnabled=false")
     
-    # Underline alignment logic
-    base_underlines = 24
-    adjustment = len(target_name) - 4
-    num_underlines = max(5, base_underlines - adjustment)
-    underlines = "_" * num_underlines
+    mobile_emulation = {
+        "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
+        "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+    }
+    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+    
+    temp_dir = os.path.join(tempfile.gettempdir(), f"v100_js_{agent_id}_{int(time.time())}")
+    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
-    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji} {underlines}/"
-    block = "\n".join([line for _ in range(20)])
-    return f"{block}\n⚡ ID: {random.randint(10000, 99999)}"
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=chrome_options)
 
-def run_life_cycle(agent_id, cookie, target_id, target_name):
-    global_start = time.time()
-    while (time.time() - global_start) < TOTAL_DURATION:
-        driver = None
-        session_start = time.time()
-        try:
-            log_status(agent_id, "🚀 Launching Agent...")
-            driver = get_driver(agent_id)
-            driver.get("https://www.instagram.com/")
-            
-            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
-            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
-            driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-            time.sleep(6) # Sufficient load time
+    stealth(driver,
+        languages=["en-US", "en"],
+        vendor="Google Inc.",
+        platform="Linux armv8l", 
+        webgl_vendor="ARM",
+        renderer="Mali-G76",
+        fix_hairline=True,
+    )
+    return driver
 
-            msg_box = find_mobile_box(driver)
-            
-            while (time.time() - session_start) < SESSION_MAX_SEC:
-                if (time.time() - global_start) > TOTAL_DURATION: break
-                
-                final_text = get_dynamic_block(target_name)
-                
-                if adaptive_inject(driver, msg_box, final_text):
-                    with COUNTER_LOCK:
-                        global GLOBAL_SENT
-                        GLOBAL_SENT += 1
-                
-                time.sleep(random.uniform(BURST_MIN, BURST_MAX))
-                
-        except Exception as e:
-            log_status(agent_id, f"⚠️ Error: {e}")
-        finally:
-            if driver: driver.quit()
-            gc.collect()
+def run_js_engine(agent_id, cookie, target_id, target_name):
+    """Injects the high-speed JS loop directly into the browser context."""
+    driver = None
+    try:
+        log_status(agent_id, "🚀 Initializing JS-Engine...")
+        driver = get_driver(agent_id)
+        driver.get("https://www.instagram.com/")
+        
+        sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
+        driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+        driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
+        time.sleep(8) # Allow full load for JS injection
+
+        # This is the "Automa-Style" logic converted to pure JS
+        js_payload = f"""
+        const targetName = "{target_name}";
+        const delay = {JS_DELAY};
+        const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
+
+        async function startPhoenix() {{
+            while (true) {{
+                try {{
+                    const msgBox = document.querySelector('textarea, [role="textbox"], [contenteditable="true"]');
+                    if (!msgBox) return;
+
+                    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                    const lines = Array(20).fill(`【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}________________________/`).join('\\n');
+                    const finalMsg = lines + "\\n⚡ ID: " + Math.floor(Math.random() * 999999);
+
+                    msgBox.focus();
+                    document.execCommand('insertText', false, finalMsg);
+                    
+                    const enterEvent = new KeyboardEvent('keydown', {{
+                        bubbles: true, cancelable: true, keyCode: 13, key: 'Enter'
+                    }});
+                    msgBox.dispatchEvent(enterEvent);
+                    
+                    await new Promise(r => setTimeout(r, delay));
+                }} catch (e) {{ console.log(e); }}
+            }}
+        }}
+        startPhoenix();
+        """
+
+        log_status(agent_id, "🔥 Injecting Payload. Firing starts now.")
+        driver.execute_script(js_payload)
+
+        # Keep the driver alive while the JS runs
+        time.sleep(TOTAL_DURATION)
+
+    except Exception as e:
+        log_status(agent_id, f"⚠️ Error: {e}")
+    finally:
+        if driver: driver.quit()
+        gc.collect()
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE", "")
@@ -152,7 +131,7 @@ def main():
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
         for i in range(THREADS):
-            executor.submit(run_life_cycle, i+1, cookie, target_id, target_name)
+            executor.submit(run_js_engine, i+1, cookie, target_id, target_name)
 
 if __name__ == "__main__":
     main()
