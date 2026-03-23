@@ -19,7 +19,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # --- 🚀 ENGINE CONFIGURATION ---
 THREADS = 3             
 TOTAL_DURATION = 25000  
-JS_DELAY = 40 # Slightly increased to 40ms for better stability
+JS_DELAY = 40 
 
 sys.stdout.reconfigure(encoding='utf-8')
 DRIVER_PATH = None
@@ -75,11 +75,10 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
             log_status(agent_id, f"⚠️ Cookie Error: {ce}")
 
         driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-        
         log_status(agent_id, "⏳ Waiting for chat to load...")
-        time.sleep(15) # Increased wait for slow GitHub runners
+        time.sleep(15)
 
-        # AGGRESSIVE JS PAYLOAD
+        # Doubled {{ }} to escape Python's f-string parser
         js_payload = f"""
         (async function() {{
             const targetName = "{target_name}";
@@ -87,18 +86,16 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
             const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
 
             function getMessageBox() {{
-                // Scans for common IG mobile DM selectors
                 return document.querySelector('textarea') || 
                        document.querySelector('[role="textbox"]') || 
                        document.querySelector('[contenteditable="true"]') ||
-                       document.querySelector('.xat24cr'); // Common IG dynamic class
+                       document.querySelector('.xat24cr');
             }}
 
             while (true) {{
                 try {{
                     const msgBox = getMessageBox();
                     if (!msgBox) {{
-                        console.log("Searching for box...");
                         await new Promise(r => setTimeout(r, 1000));
                         continue;
                     }}
@@ -107,24 +104,18 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
                     const lines = Array(20).fill(`【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ________________________/`).join('\\n');
                     const finalMsg = lines + "\\n⚡ ID: " + Math.floor(Math.random() * 999999);
 
-                    // Force Focus and Click to wake up the listener
                     msgBox.focus();
                     msgBox.click();
                     
-                    // Inject Text
                     document.execCommand('insertText', false, finalMsg);
                     
-                    // Dispatch Enter Key
                     const enterEvent = new KeyboardEvent('keydown', {{
                         bubbles: true, cancelable: true, keyCode: 13, key: 'Enter', which: 13
                     }});
                     msgBox.dispatchEvent(enterEvent);
                     
-                    // Fallback: If the text is still there, try a manual 'Input' event
-                    msgBox.dispatchEvent(new Event('input', {{ bubbles: true }}));
-
                     await new Promise(r => setTimeout(r, delay));
-                } catch (e) {{ 
+                }} catch (e) {{ 
                     console.error("JS Error", e); 
                 }}
             }}
@@ -134,7 +125,7 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
         log_status(agent_id, "🔥 JS Engine Firing...")
         driver.execute_script(js_payload)
 
-        # Monitor loop
+        # Keep browser open
         end_time = time.time() + TOTAL_DURATION
         while time.time() < end_time:
             time.sleep(20)
