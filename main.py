@@ -21,7 +21,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- V100 TUNED CONFIGURATION ---
-THREADS = 3             # 2 Agents per machine (10 Agents Total)
+THREADS = 2             # 2 Agents per machine (10 Agents Total)
 TOTAL_DURATION = 25000  # ~7 Hours
 
 # ⚡ TARGET SPEED: 80ms - 100ms
