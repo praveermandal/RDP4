@@ -11,58 +11,47 @@ jobs:
     timeout-minutes: 350
     strategy:
       matrix:
+        # 5 Virtual Machines = 25 Total Tabs (5 tabs per machine)
         machine-id: [1, 2, 3, 4, 5]
       fail-fast: false
 
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Install Dependencies
-      run: |
-        pip install selenium==4.9.0 selenium-stealth webdriver-manager
+      - name: Install Dependencies
+        run: |
+          pip install selenium==4.9.0 selenium-stealth webdriver-manager
 
-    - name: 🔥 Run Phoenix Engine
-      env:
-        INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
-        TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        TARGET_NAME: ${{ secrets.TARGET_NAME }}
-        MACHINE_INDEX: ${{ matrix.machine-id }}
-      run: |
-        python main.py
-        while true; do
-          python -u main.py
-          echo "⚠️ Engine Exit. Respawning in 5s..."
-          sleep 5
-        done
-        python main.py        while true; do
-          python -u main.py
-          echo "⚠️ Engine Exit. Respawning in 5s..."
-          sleep 5
-        done
+      - name: 🔥 Run Phoenix Engine (Machine ${{ matrix.machine-id }})
+        env:
+          PYTHONIOENCODING: utf-8
+          INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
+          TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
+          TARGET_NAME: ${{ secrets.TARGET_NAME }}
+          MESSAGES: ${{ secrets.MESSAGES }}
+          MACHINE_INDEX: ${{ matrix.machine-id }}
+        run: |
+          # 🛡️ STAGGERED START: Wait 1-60s based on Machine ID to avoid IP sync detection
+          DELAY=$(( (MACHINE_INDEX - 1) * 12 + (RANDOM % 5) ))
+          echo "⏳ Machine #${MACHINE_INDEX} sleeping for ${DELAY}s to bypass login sync..."
+          sleep $DELAY
 
-    - name: 🔥 Run Phoenix Engine (Machine ${{ matrix.machine-id }})
-      env:
-        PYTHONIOENCODING: utf-8
-        INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
-        TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        MESSAGES: ${{ secrets.MESSAGES }}
-        MACHINE_INDEX: ${{ matrix.machine-id }} # Passes the ID to your script if needed
-      run: |
-        while true; do
-          echo "🚀 Starting Linux Turbo Engine on Machine #${MACHINE_INDEX}..."
-          
-          if python main.py; then
-            echo "✅ Script finished naturally."
-          else
-            echo "❌ Script crashed internally."
-          fi
-          
-          echo "⚠️ Crash Detected. Respawning in 10 seconds..."
-          sleep 10
-        done
+          while true; do
+            echo "🚀 Launching Linux Turbo Engine on Machine #${MACHINE_INDEX}..."
+            
+            # -u ensures Python logs appear instantly in the GitHub console
+            if python -u main.py; then
+              echo "✅ Cycle finished (Nuclear Purge triggered)."
+            else
+              echo "❌ Engine crashed. Resetting state..."
+            fi
+            
+            echo "⚠️ Respawning in 15 seconds..."
+            sleep 15
+          done
