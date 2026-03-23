@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor
 # 📦 SELENIUM & DRIVER TOOLS
 from selenium import webdriver
 from selenium_stealth import stealth
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
@@ -20,10 +19,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # --- 🚀 ENGINE CONFIGURATION ---
 THREADS = 3             
 TOTAL_DURATION = 25000  
-JS_DELAY = 30 # 30ms pulse
-
-GLOBAL_SENT = 0
-COUNTER_LOCK = threading.Lock()
+JS_DELAY = 30 
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -68,22 +64,35 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
         driver = get_driver(agent_id)
         driver.get("https://www.instagram.com/")
         
-        sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
-        driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+        # --- 🛠️ SESSION ID CLEANER ---
+        # Removes 'sessionid=' if present, then trims whitespace/semicolons
+        sid = cookie.replace("sessionid=", "").split(";")[0].strip()
+        
+        try:
+            driver.add_cookie({'name': 'sessionid', 'value': sid, 'domain': '.instagram.com'})
+            log_status(agent_id, "✅ Cookie Injected Successfully")
+        except Exception as ce:
+            log_status(agent_id, f"⚠️ Cookie Error: {ce}")
+
         driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-        time.sleep(10) # Heavy wait to ensure chat loads
+        
+        log_status(agent_id, "⏳ Waiting for chat to stabilize...")
+        time.sleep(12) 
 
-        # Doubled {{ }} to escape Python f-string formatting
+        # JS Engine Payload
         js_payload = f"""
-        const targetName = "{target_name}";
-        const delay = {JS_DELAY};
-        const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
+        (async function() {{
+            const targetName = "{target_name}";
+            const delay = {JS_DELAY};
+            const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
 
-        async function startPhoenix() {{
             while (true) {{
                 try {{
                     const msgBox = document.querySelector('textarea, [role="textbox"], [contenteditable="true"]');
-                    if (!msgBox) continue;
+                    if (!msgBox) {{
+                        await new Promise(r => setTimeout(r, 1000));
+                        continue;
+                    }}
 
                     const emoji = emojis[Math.floor(Math.random() * emojis.length)];
                     const lines = Array(20).fill(`【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ________________________/`).join('\\n');
@@ -98,22 +107,23 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
                     msgBox.dispatchEvent(enterEvent);
                     
                     await new Promise(r => setTimeout(r, delay));
-                }} catch (e) {{ console.log("JS Error: ", e); }}
+                }} catch (e) {{ 
+                    console.error("JS Error", e); 
+                }}
             }}
-        }}
-        startPhoenix();
+        }})();
         """
 
-        log_status(agent_id, "🔥 JS Payload Injected. Monitoring...")
+        log_status(agent_id, "🔥 JS Engine Firing...")
         driver.execute_script(js_payload)
 
-        # Keep browser open to allow JS to run
+        # Keep alive loop
         end_time = time.time() + TOTAL_DURATION
         while time.time() < end_time:
-            time.sleep(10)
+            time.sleep(15)
 
     except Exception as e:
-        log_status(agent_id, f"⚠️ Python Error: {e}")
+        log_status(agent_id, f"❌ Engine Crash: {e}")
     finally:
         if driver: driver.quit()
         gc.collect()
