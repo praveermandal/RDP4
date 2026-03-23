@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# 🚀 PHOENIX V100.80 (ULTIMATE MERGE EDITION)
+# 🚀 PHOENIX V100.85 (CLICK-PATCH EDITION)
 # 🛡️ 2 AGENTS | 5 TABS EACH | 10 THREADS TOTAL
 # ⚡ SPEED: 180ms NATIVE JS PULSE | 2-MIN HARD RESTART CYCLE
 
@@ -22,12 +22,12 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🔥 MERGED CONFIGURATION ---
-THREADS = 2              # 2 Browsers per machine
-TABS_PER_MACHINE = 5     # 5 Tabs per browser (10 active chats total)
-TOTAL_DURATION = 25000   # ~7 Hours
-SESSION_MAX_SEC = 120    # 2 Minute Hard Restart Cycle (Flush RAM)
-PULSE_DELAY = 180        # 180ms firing rate per tab
+# --- 🔥 CONFIGURATION ---
+THREADS = 2              
+TABS_PER_MACHINE = 5     
+TOTAL_DURATION = 25000   
+SESSION_MAX_SEC = 120    
+PULSE_DELAY = 180        
 
 sys.stdout.reconfigure(encoding='utf-8')
 BROWSER_LAUNCH_LOCK = threading.Lock()
@@ -62,7 +62,7 @@ def get_driver(agent_id):
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--blink-settings=imagesEnabled=false")
         
-        # 📱 Mobile Emulation (From Script 2)
+        # 📱 Mobile Emulation is active - Requires physical clicks
         mobile_emulation = {
             "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
             "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
@@ -75,7 +75,6 @@ def get_driver(agent_id):
         service = Service(DRIVER_PATH)
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
-        # 🛡️ Stealth Settings (From Script 2)
         stealth(driver,
             languages=["en-US", "en"],
             vendor="Google Inc.",
@@ -87,17 +86,14 @@ def get_driver(agent_id):
         return driver
 
 def inject_hyper_engine(driver, handle, tab_index, target_name):
-    """Deploys the 180ms JS loop with the auto-aligning 20-line block logic natively in JS."""
     try:
         driver.switch_to.window(handle)
         
-        # We translate the dynamic python block logic directly into Javascript
         js_payload = f"""
             const targetName = "{target_name}";
             const pulse = {PULSE_DELAY};
             const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
             
-            // Auto-Align Underline Logic translated to JS
             const baseUnderlines = 24;
             const adjustment = targetName.length - 4;
             const numUnderlines = Math.max(5, baseUnderlines - adjustment);
@@ -106,34 +102,44 @@ def inject_hyper_engine(driver, handle, tab_index, target_name):
             if (window.hyperEngine) clearInterval(window.hyperEngine);
 
             window.hyperEngine = setInterval(() => {{
-                const box = document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
+                // 🛑 Restored Automa selectors
+                const box = document.querySelector('.xat24cr') || 
+                            document.querySelector('textarea') || 
+                            document.querySelector('div[role="textbox"]') || 
+                            document.querySelector('[contenteditable="true"]');
+                
                 if (box) {{
                     const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    const salt = Math.floor(Math.random() * 8999 + 1000); // 1000 to 9999
+                    const salt = Math.floor(Math.random() * 8999 + 1000); 
                     
-                    // Construct 20-line block
                     const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ${{underlines}}/`;
                     const block = Array(20).fill(line).join('\\n');
                     const finalText = block + "\\n⚡ ID: " + salt;
 
+                    // 🛑 CRITICAL: The Missing Click
+                    box.click();
                     box.focus();
+                    
                     document.execCommand('insertText', false, finalText);
                     box.dispatchEvent(new Event('input', {{ bubbles: true }}));
 
-                    // Send Button / Enter Fallback
-                    const sendBtn = document.querySelector('div.xjyslct') || 
-                                    Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim().toLowerCase() === 'send');
-                    if (sendBtn) {{
-                        sendBtn.click();
-                    }} else {{
-                        const enter = new KeyboardEvent('keydown', {{
-                            bubbles: true, cancelable: true, key: 'Enter', keyCode: 13
-                        }});
-                        box.dispatchEvent(enter);
-                    }}
-                    
-                    // RAM Flush
-                    setTimeout(() => {{ if(box) box.innerHTML = ""; }}, 50);
+                    // Small delay to let React process the input before hitting send
+                    setTimeout(() => {{
+                        const sendBtn = document.querySelector('.xjyslct') || 
+                                        Array.from(document.querySelectorAll('div[role="button"]')).find(el => el.textContent && el.textContent.trim().toLowerCase() === 'send');
+                        
+                        if (sendBtn) {{
+                            sendBtn.click();
+                        }} else {{
+                            const enter = new KeyboardEvent('keydown', {{
+                                bubbles: true, cancelable: true, key: 'Enter', keyCode: 13
+                            }});
+                            box.dispatchEvent(enter);
+                        }}
+                        
+                        // Clear Box
+                        setTimeout(() => {{ if(box) box.innerHTML = ""; }}, 40);
+                    }}, 20);
                 }}
             }}, pulse);
         """
@@ -153,33 +159,28 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
-            # Secure Cookie Login
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # Launch 5 Tabs (Hyper-Tab Setup)
             log_status(agent_id, f"🌐 Spawning {TABS_PER_MACHINE} Direct Chats...")
             for i in range(TABS_PER_MACHINE):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
-                time.sleep(6) # Safe stagger
+                time.sleep(8) 
 
-            handles = driver.window_handles[1:] # Ignore root tab
+            handles = driver.window_handles[1:] 
             
-            # Inject Engine into all 5 tabs
             for idx, handle in enumerate(handles):
                 inject_hyper_engine(driver, handle, idx + 1, target_name)
             
             log_status(agent_id, "🔥 ALL TABS FIRING! Entering 2-minute cruise phase...")
 
-            # --- THE 2 MINUTE CYCLE LIMIT ---
             while (time.time() - session_start) < SESSION_MAX_SEC:
                 if (time.time() - global_start) > TOTAL_DURATION: break
-                time.sleep(10) # Just keep the Python thread alive while JS does the work
+                time.sleep(10) 
                 
         except Exception as e:
             log_status(agent_id, f"⚠️ Session Error: {e}")
         finally:
-            # Complete Nuke & Rebuild every 2 minutes
             log_status(agent_id, "♻️ 2-Minute Mark Reached: Full Restart & RAM Flush")
             if driver: driver.quit()
             gc.collect()
