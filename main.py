@@ -7,8 +7,6 @@ import threading
 import sys
 import gc
 import tempfile
-import subprocess
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 # 📦 SELENIUM & DRIVER TOOLS
@@ -21,15 +19,11 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 🔥 ULTRA-SPEED V100 CONFIGURATION ---
-THREADS = 3             # 3 Agents per machine (15 Agents Total)
+THREADS = 3             # 3 Agents per machine
 TOTAL_DURATION = 25000  # ~7 Hours
-
-# ⚡ TARGET SPEED: 30ms - 50ms (Limit of JS Injection)
-BURST_MIN = 0.03
-BURST_MAX = 0.05
-
-# ♻️ RESTART CYCLES (3 Minutes for massive bursts)
-SESSION_MAX_SEC = 180    
+BURST_MIN = 0.03        # 30ms
+BURST_MAX = 0.05        # 50ms
+SESSION_MAX_SEC = 180   # 3 Minute Cycles
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -49,8 +43,6 @@ def get_driver(agent_id):
         chrome_options.add_argument("--no-sandbox") 
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
-        
-        # ⚡ OPTIMIZATION: Disable images/CSS to save RAM and speed up page load
         chrome_options.add_argument("--blink-settings=imagesEnabled=false")
         
         mobile_emulation = {
@@ -73,20 +65,17 @@ def get_driver(agent_id):
             renderer="Mali-G76",
             fix_hairline=True,
         )
-        driver.custom_temp_path = temp_dir
         return driver
 
 def find_mobile_box(driver):
     selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
     for xpath in selectors:
-        try: 
-            return driver.find_element(By.XPATH, xpath)
+        try: return driver.find_element(By.XPATH, xpath)
         except: continue
     return None
 
 def adaptive_inject(driver, element, text):
     try:
-        # High-speed JS Injection (Avoids slow keyboard simulation)
         driver.execute_script("arguments[0].focus();", element)
         driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
         element.send_keys(Keys.ENTER)
@@ -94,15 +83,16 @@ def adaptive_inject(driver, element, text):
     except: return False
 
 def get_dynamic_block(target_name):
-    """Generates a fresh 30-line block with a rotating emoji (No Underlines)."""
+    """Generates a 20-line block with rotating emoji and fixed underlines."""
     emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"]
     selected_emoji = random.choice(emojis)
     
-    # 30-line vertical stack for massive impact
-    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji}"
-    block = "\n".join([line for _ in range(30)])
+    # Standard underline length for Instagram Mobile alignment
+    underlines = "________________________" 
     
-    # Unique ID to bypass duplicate filters
+    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji} {underlines}/"
+    block = "\n".join([line for _ in range(20)])
+    
     return f"{block}\n⚡ ID: {random.randint(100000, 999999)}"
 
 def run_life_cycle(agent_id, cookie, target_id, target_name):
@@ -111,7 +101,7 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
         driver = None
         session_start = time.time()
         try:
-            log_status(agent_id, "🚀 Launching Heavy Speed Agent...")
+            log_status(agent_id, "🚀 Launching Agent...")
             driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
@@ -125,7 +115,6 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             while (time.time() - session_start) < SESSION_MAX_SEC:
                 if (time.time() - global_start) > TOTAL_DURATION: break
                 
-                # 🔄 Generates fresh 30-line block
                 final_text = get_dynamic_block(target_name)
                 
                 if adaptive_inject(driver, msg_box, final_text):
@@ -133,13 +122,11 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
                 
-                # ⚡ High Frequency Pulse
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
         except Exception as e:
             log_status(agent_id, f"⚠️ Error: {e}")
         finally:
-            log_status(agent_id, "♻️ Agent Rebooting...")
             if driver: driver.quit()
             gc.collect()
 
