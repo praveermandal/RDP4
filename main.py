@@ -23,11 +23,23 @@ JS_DELAY = 30
 
 sys.stdout.reconfigure(encoding='utf-8')
 
+# Global variable to store the driver path once installed
+DRIVER_PATH = None
+INSTALL_LOCK = threading.Lock()
+
 def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
 def get_driver(agent_id):
+    global DRIVER_PATH
+    
+    # Thread-safe installation
+    with INSTALL_LOCK:
+        if DRIVER_PATH is None:
+            print(f"📦 Installing Chrome Driver...", flush=True)
+            DRIVER_PATH = ChromeDriverManager().install()
+
     chrome_options = Options()
     chrome_options.add_argument("--headless=new") 
     chrome_options.add_argument("--no-sandbox") 
@@ -44,7 +56,7 @@ def get_driver(agent_id):
     temp_dir = os.path.join(tempfile.gettempdir(), f"v100_js_{agent_id}_{int(time.time())}")
     chrome_options.add_argument(f"--user-data-dir={temp_dir}")
 
-    service = Service(ChromeDriverManager().install())
+    service = Service(DRIVER_PATH)
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     stealth(driver,
@@ -64,22 +76,21 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
         driver = get_driver(agent_id)
         driver.get("https://www.instagram.com/")
         
-        # --- 🛠️ SESSION ID CLEANER ---
-        # Removes 'sessionid=' if present, then trims whitespace/semicolons
-        sid = cookie.replace("sessionid=", "").split(";")[0].strip()
+        # --- 🛠️ BULLETPROOF SID CLEANER ---
+        # Simply strips everything but the core ID
+        sid = cookie.replace("sessionid=", "").strip().split(";")[0]
         
         try:
             driver.add_cookie({'name': 'sessionid', 'value': sid, 'domain': '.instagram.com'})
-            log_status(agent_id, "✅ Cookie Injected Successfully")
+            log_status(agent_id, "✅ Cookie Injected")
         except Exception as ce:
             log_status(agent_id, f"⚠️ Cookie Error: {ce}")
 
         driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
         
-        log_status(agent_id, "⏳ Waiting for chat to stabilize...")
+        log_status(agent_id, "⏳ Waiting for chat...")
         time.sleep(12) 
 
-        # JS Engine Payload
         js_payload = f"""
         (async function() {{
             const targetName = "{target_name}";
@@ -117,7 +128,7 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
         log_status(agent_id, "🔥 JS Engine Firing...")
         driver.execute_script(js_payload)
 
-        # Keep alive loop
+        # Monitor loop
         end_time = time.time() + TOTAL_DURATION
         while time.time() < end_time:
             time.sleep(15)
@@ -137,9 +148,17 @@ def main():
         print("❌ Missing Secrets!")
         return
 
+    # Pre-install driver before starting threads to avoid "Zip File" errors
+    global DRIVER_PATH
+    DRIVER_PATH = ChromeDriverManager().install()
+
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
         for i in range(THREADS):
-            executor.submit(run_js_engine, i+1, cookie, target_id, target_name)
+            executor.submit(run_life_cycle_dummy, i+1, cookie, target_id, target_name)
+
+# Helper to route the executor
+def run_life_cycle_dummy(agent_id, cookie, target_id, target_name):
+    run_js_engine(agent_id, cookie, target_id, target_name)
 
 if __name__ == "__main__":
     main()
