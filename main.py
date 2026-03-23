@@ -20,16 +20,16 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- V100 TUNED CONFIGURATION ---
-THREADS = 2             # 2 Agents per machine (10 Agents Total)
+# --- 🔥 ULTRA-SPEED V100 CONFIGURATION ---
+THREADS = 3             # 3 Agents per machine (15 Agents Total)
 TOTAL_DURATION = 25000  # ~7 Hours
 
-# ⚡ TARGET SPEED: 80ms - 100ms
-BURST_MIN = 0.08
-BURST_MAX = 0.10
+# ⚡ TARGET SPEED: 30ms - 50ms (Limit of JS Injection)
+BURST_MIN = 0.03
+BURST_MAX = 0.05
 
-# ♻️ RESTART CYCLES (2 Minutes)
-SESSION_MAX_SEC = 120    
+# ♻️ RESTART CYCLES (3 Minutes for massive bursts)
+SESSION_MAX_SEC = 180    
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -43,12 +43,15 @@ def log_status(agent_id, msg):
 
 def get_driver(agent_id):
     with BROWSER_LAUNCH_LOCK:
-        time.sleep(2) 
+        time.sleep(1) 
         chrome_options = Options()
         chrome_options.add_argument("--headless=new") 
         chrome_options.add_argument("--no-sandbox") 
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
+        
+        # ⚡ OPTIMIZATION: Disable images/CSS to save RAM and speed up page load
+        chrome_options.add_argument("--blink-settings=imagesEnabled=false")
         
         mobile_emulation = {
             "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
@@ -83,6 +86,7 @@ def find_mobile_box(driver):
 
 def adaptive_inject(driver, element, text):
     try:
+        # High-speed JS Injection (Avoids slow keyboard simulation)
         driver.execute_script("arguments[0].focus();", element)
         driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
         element.send_keys(Keys.ENTER)
@@ -90,24 +94,16 @@ def adaptive_inject(driver, element, text):
     except: return False
 
 def get_dynamic_block(target_name):
-    """Generates a fresh 20-line block with a rotating emoji and auto-aligned underlines."""
+    """Generates a fresh 30-line block with a rotating emoji (No Underlines)."""
     emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"]
     selected_emoji = random.choice(emojis)
     
-    # Target length for the underline section to maintain alignment
-    # If the name gets longer, we subtract underlines to keep the total width same
-    base_underlines = 24
-    adjustment = len(target_name) - 4 # 4 is the length of 'EZRA'
-    num_underlines = max(5, base_underlines - adjustment)
-    underlines = "_" * num_underlines
-
-    # The perfect format you requested
-    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji} {underlines}/"
+    # 30-line vertical stack for massive impact
+    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji}"
+    block = "\n".join([line for _ in range(30)])
     
-    # Build the 20-line block
-    block = "\n".join([line for _ in range(20)])
     # Unique ID to bypass duplicate filters
-    return f"{block}\n⚡ ID: {random.randint(1000, 9999)}"
+    return f"{block}\n⚡ ID: {random.randint(100000, 999999)}"
 
 def run_life_cycle(agent_id, cookie, target_id, target_name):
     global_start = time.time()
@@ -115,22 +111,21 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
         driver = None
         session_start = time.time()
         try:
-            log_status(agent_id, "🚀 Launching Browser...")
+            log_status(agent_id, "🚀 Launching Heavy Speed Agent...")
             driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-            time.sleep(5)
+            time.sleep(4) 
 
             msg_box = find_mobile_box(driver)
             
-            # --- THE FIRING LOOP ---
             while (time.time() - session_start) < SESSION_MAX_SEC:
                 if (time.time() - global_start) > TOTAL_DURATION: break
                 
-                # 🔄 Generates fresh block with a new emoji each time
+                # 🔄 Generates fresh 30-line block
                 final_text = get_dynamic_block(target_name)
                 
                 if adaptive_inject(driver, msg_box, final_text):
@@ -138,24 +133,23 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
                         global GLOBAL_SENT
                         GLOBAL_SENT += 1
                 
-                # ⚡ Burst Pulse Delay
+                # ⚡ High Frequency Pulse
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
         except Exception as e:
             log_status(agent_id, f"⚠️ Error: {e}")
         finally:
-            log_status(agent_id, "♻️ 2-Minute Restart & RAM Flush")
+            log_status(agent_id, "♻️ Agent Rebooting...")
             if driver: driver.quit()
             gc.collect()
 
 def main():
-    # 🔑 Credentials from GitHub Secrets
     cookie = os.environ.get("INSTA_COOKIE", "")
     target_id = os.environ.get("TARGET_THREAD_ID", "")
-    target_name = os.environ.get("TARGET_NAME", "EZRA") # Defaults to EZRA if secret is missing
+    target_name = os.environ.get("TARGET_NAME", "EZRA") 
     
     if not cookie or not target_id:
-        print("❌ Missing Secrets (INSTA_COOKIE or TARGET_THREAD_ID)!")
+        print("❌ Missing Secrets!")
         return
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
