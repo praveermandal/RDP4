@@ -6,6 +6,7 @@ import threading
 import sys
 import gc
 import tempfile
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 
 # 📦 SELENIUM & DRIVER TOOLS
@@ -15,13 +16,14 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🔥 SPEED & CYCLE CONFIGURATION ---
+# --- 🔥 SPEED & ENDURANCE CONFIGURATION ---
 THREADS = 2             
-TOTAL_DURATION = 25000  
+TOTAL_DURATION = 250000 
 
-# ⚡ EXTREME TIMING SETTINGS
-JS_DELAY = 50           # 50ms between messages (Ultra-Speed)
-REFRESH_CYCLE = 120     # Refresh page every 2 minutes (120 seconds)
+# ⚡ TIMING SETTINGS
+JS_DELAY = 50           # 50ms (Ultra-Speed)
+REFRESH_CYCLE = 120     # Soft Refresh every 2 minutes
+HARD_RESET_CYCLE = 1800 # Kill and restart Chrome every 30 mins
 
 sys.stdout.reconfigure(encoding='utf-8')
 DRIVER_PATH = None
@@ -31,6 +33,15 @@ def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
+def cleanup_temp_dirs(agent_id):
+    temp_dir_base = tempfile.gettempdir()
+    for item in os.listdir(temp_dir_base):
+        if item.startswith(f"automa_{agent_id}_"):
+            try:
+                shutil.rmtree(os.path.join(temp_dir_base, item), ignore_errors=True)
+            except:
+                pass
+
 def get_driver(agent_id):
     global DRIVER_PATH
     with INSTALL_LOCK:
@@ -38,6 +49,8 @@ def get_driver(agent_id):
             log_status(agent_id, "📦 Installing Chrome Driver...")
             DRIVER_PATH = ChromeDriverManager().install()
 
+    cleanup_temp_dirs(agent_id) 
+    
     chrome_options = Options()
     chrome_options.add_argument("--headless=new") 
     chrome_options.add_argument("--no-sandbox") 
@@ -68,99 +81,103 @@ def get_driver(agent_id):
     return driver
 
 def run_prvr_engine(agent_id, cookie, target_id, target_name):
-    driver = None
     global_start = time.time()
     
-    try:
-        log_status(agent_id, "🚀 Launching Browser...")
-        driver = get_driver(agent_id)
-        driver.get("https://www.instagram.com/")
+    while (time.time() - global_start) < TOTAL_DURATION:
+        driver = None
+        hard_reset_timer = time.time()
         
-        sid = cookie.replace("sessionid=", "").strip().split(";")[0]
-        driver.add_cookie({'name': 'sessionid', 'value': sid, 'domain': '.instagram.com'})
-        
-        # --- ♻️ THE 2-MINUTE REFRESH LOOP ---
-        while (time.time() - global_start) < TOTAL_DURATION:
-            try:
-                driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-                log_status(agent_id, "⏳ Loading Chat...")
-                time.sleep(12) # Wait for IG to render
+        try:
+            log_status(agent_id, "🚀 Launching Fresh Browser Profile...")
+            driver = get_driver(agent_id)
+            driver.get("https://www.instagram.com/")
+            
+            sid = cookie.replace("sessionid=", "").strip().split(";")[0]
+            driver.add_cookie({'name': 'sessionid', 'value': sid, 'domain': '.instagram.com'})
+            
+            while (time.time() - hard_reset_timer) < HARD_RESET_CYCLE:
+                try:
+                    driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
+                    time.sleep(12) 
 
-                js_payload = f"""
-                (async function() {{
-                    const targetName = "{target_name}";
-                    const delay = {JS_DELAY};
-                    const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
+                    # --- ⚡ HYPER-OPTIMIZED 50ms PAYLOAD ---
+                    js_payload = f"""
+                    (async function() {{
+                        const targetName = "{target_name}";
+                        const delay = {JS_DELAY};
+                        const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"];
 
-                    function getMessageBox() {{
-                        return document.querySelector('textarea') || 
-                               document.querySelector('[role="textbox"]') || 
-                               document.querySelector('[contenteditable="true"]') ||
-                               document.querySelector('.xat24cr');
-                    }}
-
-                    // Infinite rapid-fire loop
-                    while (true) {{
-                        try {{
-                            const msgBox = getMessageBox();
-                            if (!msgBox) {{
-                                await new Promise(r => setTimeout(r, 1000));
-                                continue;
-                            }}
-
-                            const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                            const traceID = Math.random().toString(36).substring(2, 9).toUpperCase();
-                            
-                            // 👇 REDUCED UNDERLINE LENGTH HERE 👇
-                            const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} __________/`;
-                            const block = Array(30).fill(line).join('\\n');
-                            const finalMsg = block + "\\n⚡ ID: " + traceID;
-
-                            msgBox.focus();
-                            document.execCommand('insertText', false, finalMsg);
-                            msgBox.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                            
-                            // Tiny pause to let IG React register the text
-                            await new Promise(r => setTimeout(r, 20)); 
-                            
-                            const sendBtn = document.querySelector('div.xjyslct') || 
-                                            Array.from(document.querySelectorAll('div[role="button"]')).find(el => el.textContent.trim().toLowerCase() === 'send') ||
-                                            Array.from(document.querySelectorAll('button')).find(el => el.textContent.trim().toLowerCase() === 'send');
-                            
-                            if (sendBtn) {{ sendBtn.click(); }} 
-                            else {{
-                                const enterEvent = new KeyboardEvent('keydown', {{ bubbles: true, cancelable: true, keyCode: 13, key: 'Enter' }});
-                                msgBox.dispatchEvent(enterEvent);
-                            }}
-
-                            await new Promise(r => setTimeout(r, delay));
-                            console.clear();
-                        }} catch (e) {{ 
-                            console.error("JS Loop Error", e); 
+                        function getMessageBox() {{
+                            return document.querySelector('textarea') || 
+                                   document.querySelector('[role="textbox"]') || 
+                                   document.querySelector('[contenteditable="true"]') ||
+                                   document.querySelector('.xat24cr');
                         }}
-                    }}
-                }})();
-                """
 
-                log_status(agent_id, f"🔥 Firing 30-Line Blocks at {JS_DELAY}ms...")
-                driver.execute_script(js_payload)
+                        while (true) {{
+                            try {{
+                                const msgBox = getMessageBox();
+                                if (!msgBox) {{
+                                    await new Promise(r => setTimeout(r, 1000));
+                                    continue;
+                                }}
 
-                # Let JS spam for exactly 2 minutes (120 seconds)
-                time.sleep(REFRESH_CYCLE)
-                
-                log_status(agent_id, "♻️ 2-Min Cycle Complete. Flushing RAM and Refreshing...")
-                driver.refresh()
-                gc.collect() 
-                
-            except Exception as loop_err:
-                log_status(agent_id, f"⚠️ Cycle Error: {loop_err}. Retrying in 10s...")
-                time.sleep(10)
+                                // 🛑 CRITICAL FIX: Manually wipe the box before IG has a chance to
+                                if (msgBox.innerHTML !== '') {{
+                                    msgBox.innerHTML = '';
+                                }}
 
-    except Exception as e:
-        log_status(agent_id, f"❌ Fatal Crash: {e}")
-    finally:
-        if driver: driver.quit()
-        gc.collect()
+                                const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                                const traceID = Math.random().toString(36).substring(2, 9).toUpperCase();
+                                
+                                const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} __________/`;
+                                const block = Array(22).fill(line).join('\\n');
+                                const finalMsg = block + "\\n⚡ ID: " + traceID;
+
+                                msgBox.focus();
+                                document.execCommand('insertText', false, finalMsg);
+                                msgBox.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                
+                                // Give React 15ms to render the Send button
+                                await new Promise(r => setTimeout(r, 15)); 
+                                
+                                const sendBtn = document.querySelector('div.xjyslct') || 
+                                                Array.from(document.querySelectorAll('div[role="button"]')).find(el => el.textContent.trim().toLowerCase() === 'send');
+                                
+                                if (sendBtn) {{ 
+                                    sendBtn.click(); 
+                                }} else {{
+                                    const enterEvent = new KeyboardEvent('keydown', {{ bubbles: true, cancelable: true, keyCode: 13, key: 'Enter' }});
+                                    msgBox.dispatchEvent(enterEvent);
+                                }}
+
+                                await new Promise(r => setTimeout(r, delay));
+                            }} catch (e) {{ 
+                                console.error("JS Loop Error", e); 
+                            }}
+                        }}
+                    }})();
+                    """
+
+                    log_status(agent_id, f"🔥 Firing 22-Line Blocks at {JS_DELAY}ms...")
+                    driver.execute_script(js_payload)
+
+                    time.sleep(REFRESH_CYCLE)
+                    log_status(agent_id, "♻️ 2-Min Soft Refresh...")
+                    driver.refresh()
+                    
+                except Exception as loop_err:
+                    log_status(agent_id, f"⚠️ Cycle Error: {loop_err}. Retrying in 10s...")
+                    time.sleep(10)
+
+            log_status(agent_id, "🛑 30-Minute Hard Reset Reached. Nuking Browser...")
+
+        except Exception as e:
+            log_status(agent_id, f"❌ Session Crash: {e}")
+        finally:
+            if driver: driver.quit()
+            gc.collect()
+            time.sleep(5) 
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE", "")
@@ -168,7 +185,7 @@ def main():
     target_name = os.environ.get("TARGET_NAME", "PRVR") 
     
     if not cookie or not target_id:
-        print("❌ Missing Secrets (INSTA_COOKIE or TARGET_THREAD_ID)!")
+        print("❌ Missing Secrets!")
         return
 
     with ThreadPoolExecutor(max_workers=THREADS) as executor:
