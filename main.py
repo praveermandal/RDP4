@@ -18,12 +18,9 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
 # --- 🚀 ENGINE CONFIGURATION ---
-THREADS = 3             # 3 Machines in the matrix
+THREADS = 3             
 TOTAL_DURATION = 25000  
-
-# ⚡ JS PULSE SPEED (Milliseconds)
-# 30ms is the "Sweet Spot" for bypass
-JS_DELAY = 30 
+JS_DELAY = 30 # 30ms pulse
 
 GLOBAL_SENT = 0
 COUNTER_LOCK = threading.Lock()
@@ -65,7 +62,6 @@ def get_driver(agent_id):
     return driver
 
 def run_js_engine(agent_id, cookie, target_id, target_name):
-    """Injects the high-speed JS loop directly into the browser context."""
     driver = None
     try:
         log_status(agent_id, "🚀 Initializing JS-Engine...")
@@ -75,9 +71,9 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
         sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
         driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
         driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-        time.sleep(8) # Allow full load for JS injection
+        time.sleep(10) # Heavy wait to ensure chat loads
 
-        # This is the "Automa-Style" logic converted to pure JS
+        # Doubled {{ }} to escape Python f-string formatting
         js_payload = f"""
         const targetName = "{target_name}";
         const delay = {JS_DELAY};
@@ -87,10 +83,10 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
             while (true) {{
                 try {{
                     const msgBox = document.querySelector('textarea, [role="textbox"], [contenteditable="true"]');
-                    if (!msgBox) return;
+                    if (!msgBox) continue;
 
                     const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    const lines = Array(20).fill(`【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}________________________/`).join('\\n');
+                    const lines = Array(20).fill(`【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ________________________/`).join('\\n');
                     const finalMsg = lines + "\\n⚡ ID: " + Math.floor(Math.random() * 999999);
 
                     msgBox.focus();
@@ -102,20 +98,22 @@ def run_js_engine(agent_id, cookie, target_id, target_name):
                     msgBox.dispatchEvent(enterEvent);
                     
                     await new Promise(r => setTimeout(r, delay));
-                }} catch (e) {{ console.log(e); }}
+                }} catch (e) {{ console.log("JS Error: ", e); }}
             }}
         }}
         startPhoenix();
         """
 
-        log_status(agent_id, "🔥 Injecting Payload. Firing starts now.")
+        log_status(agent_id, "🔥 JS Payload Injected. Monitoring...")
         driver.execute_script(js_payload)
 
-        # Keep the driver alive while the JS runs
-        time.sleep(TOTAL_DURATION)
+        # Keep browser open to allow JS to run
+        end_time = time.time() + TOTAL_DURATION
+        while time.time() < end_time:
+            time.sleep(10)
 
     except Exception as e:
-        log_status(agent_id, f"⚠️ Error: {e}")
+        log_status(agent_id, f"⚠️ Python Error: {e}")
     finally:
         if driver: driver.quit()
         gc.collect()
