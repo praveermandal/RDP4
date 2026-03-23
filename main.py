@@ -1,123 +1,160 @@
-# -*- coding: utf-8 -*-
-import os, time, re, random, datetime, threading, sys, gc, tempfile, shutil
+import os
+import time
+import re
+import random
+import datetime
+import threading
+import sys
+import gc
+import tempfile
+import shutil
+from concurrent.futures import ThreadPoolExecutor
+
+# 📦 SELENIUM & DRIVER TOOLS
 from selenium import webdriver
 from selenium_stealth import stealth
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- ⚡ V101.6 HYPER-SPEED CONFIG ---
-TABS_PER_MACHINE = 3    
-PURGE_INTERVAL = 120    # ♻️ Nuclear restart every 2 mins
-STRIKE_SPEED = 180      # 180ms - Pure JS Speed
+# --- V102 TUNED CONFIGURATION ---
+THREADS = 2             # 2 Browsers
+TABS_PER_AGENT = 3      # 3 Tabs per Browser (Total 6 Streams)
+TOTAL_DURATION = 25000  
+
+# ⚡ TARGET SPEED
+BURST_MIN = 0.05        # Dropped to 50ms for maximum fire
+BURST_MAX = 0.08
+
+# ♻️ RESTART CYCLES
+SESSION_MAX_SEC = 120    
+
+GLOBAL_SENT = 0
+COUNTER_LOCK = threading.Lock()
+BROWSER_LAUNCH_LOCK = threading.Lock()
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-def log_status(msg):
+def log_status(agent_id, msg):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"[{timestamp}] [Phoenix V101.6]: {msg}", flush=True)
+    print(f"[{timestamp}] Agent {agent_id}: {msg}", flush=True)
 
-def get_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new") 
-    chrome_options.add_argument("--no-sandbox") 
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--blink-settings=imagesEnabled=false")
+def get_driver(agent_id):
+    with BROWSER_LAUNCH_LOCK:
+        time.sleep(1) 
+        chrome_options = Options()
+        chrome_options.add_argument("--headless=new") 
+        chrome_options.add_argument("--no-sandbox") 
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--disable-renderer-backgrounding")
+        
+        mobile_emulation = {
+            "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
+            "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
+        }
+        chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
+        
+        temp_dir = os.path.join(tempfile.gettempdir(), f"v102_{agent_id}_{int(time.time())}")
+        chrome_options.add_argument(f"--user-data-dir={temp_dir}")
+
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+
+        stealth(driver,
+            languages=["en-US", "en"],
+            vendor="Google Inc.",
+            platform="Linux armv8l", 
+            webgl_vendor="ARM",
+            renderer="Mali-G76",
+            fix_hairline=True,
+        )
+        return driver
+
+def find_mobile_box(driver):
+    selectors = ["//textarea", "//div[@role='textbox']", "//div[@contenteditable='true']"]
+    for xpath in selectors:
+        try: return driver.find_element(By.XPATH, xpath)
+        except: continue
+    return None
+
+def adaptive_inject(driver, element, text):
+    try:
+        driver.execute_script("arguments[0].focus();", element)
+        driver.execute_script("document.execCommand('insertText', false, arguments[0]);", text)
+        element.send_keys(Keys.ENTER)
+        return True
+    except: return False
+
+def get_dynamic_block(target_name):
+    emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️", "🐍", "🦍"]
+    selected_emoji = random.choice(emojis)
+    base_underlines = 24
+    adjustment = len(target_name) - 4 
+    num_underlines = max(5, base_underlines - adjustment)
+    underlines = "_" * num_underlines
+    line = f"【 {target_name} 】 SAY P R V R बाप {selected_emoji} {underlines}/"
+    block = "\n".join([line for _ in range(20)])
+    return f"{block}\n⚡ ID: {random.randint(1000, 9999)}"
+
+def tab_striker(driver, handle, agent_id, target_name, session_start, global_start):
+    """Internal loop for each tab to fire independently."""
+    driver.switch_to.window(handle)
+    msg_box = find_mobile_box(driver)
     
-    # 🛑 CRITICAL FOR SPEED: Keep background tabs alive
-    chrome_options.add_argument("--disable-renderer-backgrounding")
-    chrome_options.add_argument("--disable-background-timer-throttling")
-    
-    chrome_options.add_experimental_option("mobileEmulation", {"deviceName": "iPad Pro"})
-    
-    temp_dir = os.path.join(tempfile.gettempdir(), f"v101_nuke_{int(time.time())}")
-    chrome_options.add_argument(f"--user-data-dir={temp_dir}")
-    
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-    driver.set_page_load_timeout(30)
-    return driver
+    while (time.time() - session_start) < SESSION_MAX_SEC:
+        if (time.time() - global_start) > TOTAL_DURATION: break
+        if msg_box:
+            final_text = get_dynamic_block(target_name)
+            adaptive_inject(driver, msg_box, final_text)
+        time.sleep(random.uniform(BURST_MIN, BURST_MAX))
 
-def deploy_hyper_engine(driver, target_id, target_name):
-    """Spawns 3 Tabs and injects an independent JS loop into each."""
-    
-    for i in range(TABS_PER_MACHINE):
-        tab_idx = i + 1
-        log_status(f"🌐 Loading Tab {tab_idx}...")
-        driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
-        # ⏳ Reduced stagger to 6s for faster start
-        time.sleep(6) 
-
-    handles = driver.window_handles[1:]
-    
-    for idx, handle in enumerate(handles):
-        try:
-            driver.switch_to.window(handle)
-            # Fast Injection: No Python waiting inside this loop
-            driver.execute_script(f"""
-                const targetName = "{target_name}";
-                const pulse = {STRIKE_SPEED};
-                const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️"];
-                
-                const baseLines = 20;
-                const adjustment = targetName.length - 4;
-                const underscores = "_".repeat(Math.max(5, baseLines - adjustment));
-
-                window.strikeInterval = setInterval(() => {{
-                    const box = document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
-                    if (box) {{
-                        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                        const salt = Math.random().toString(36).substring(7).toUpperCase();
-                        const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ${{underscores}}/`;
-                        const block = Array(22).fill(line).join('\\n') + "\\n⚡ ID: " + salt;
-
-                        box.focus();
-                        document.execCommand('insertText', false, block);
-                        box.dispatchEvent(new Event('input', {{ bubbles: true }}));
-
-                        const enter = new KeyboardEvent('keydown', {{
-                            bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
-                        }});
-                        box.dispatchEvent(enter);
-
-                        // Wipe UI memory every 50ms to keep it fast
-                        setTimeout(() => {{ if(box) box.innerHTML = ""; }}, 50);
-                    }}
-                }}, pulse);
-            """)
-            log_status(f"✅ Tab {idx+1}: Engine Firing.")
-        except: pass
-
-    log_status(f"🔥 ALL STREAMS SYNCED. Total Start Time: ~35s.")
-
-def main():
-    cookie = os.environ.get("INSTA_COOKIE")
-    target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "PRVR")
-    
-    if not cookie or not target_id: return
-
-    while True:
+def run_life_cycle(agent_id, cookie, target_id, target_name):
+    global_start = time.time()
+    while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
+        session_start = time.time()
         try:
-            driver = get_driver()
+            log_status(agent_id, "🚀 Launching Multi-Stream Browser...")
+            driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
-            # Login
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            deploy_hyper_engine(driver, target_id, target_name)
+            # --- PARALLEL TAB LAUNCH ---
+            for _ in range(TABS_PER_AGENT):
+                driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
+                time.sleep(3) # Ultra-fast stagger
+
+            handles = driver.window_handles[1:]
             
-            # 🛑 CRITICAL: Python sleeps here while the BROWSER does the work
-            time.sleep(PURGE_INTERVAL)
-            
+            # Use ThreadPool to fire from all tabs at the same time
+            with ThreadPoolExecutor(max_workers=TABS_PER_AGENT) as tab_executor:
+                for h in handles:
+                    tab_executor.submit(tab_striker, driver, h, agent_id, target_name, session_start, global_start)
+                
         except Exception as e:
-            log_status(f"⚠️ Error: {e}")
+            log_status(agent_id, f"⚠️ Error: {e}")
         finally:
+            log_status(agent_id, "♻️ RAM Flush & Reboot")
             if driver: driver.quit()
             gc.collect()
-            time.sleep(2)
+
+def main():
+    cookie = os.environ.get("INSTA_COOKIE", "")
+    target_id = os.environ.get("TARGET_THREAD_ID", "")
+    target_name = os.environ.get("TARGET_NAME", "EZRA") 
+    
+    if not cookie or not target_id:
+        print("❌ Missing Secrets!")
+        return
+
+    with ThreadPoolExecutor(max_workers=THREADS) as executor:
+        for i in range(THREADS):
+            executor.submit(run_life_cycle, i+1, cookie, target_id, target_name)
 
 if __name__ == "__main__":
     main()
