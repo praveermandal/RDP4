@@ -7,10 +7,10 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🚀 V110 DOUBLE-BUFFERED ENGINE ---
+# --- 🚀 V111 TRIPLE-BUFFERED ENGINE ---
 THREADS = 2 
-BURST_MIN = 0.01  # 🔥 10ms (The absolute floor for Python)
-BURST_MAX = 0.03 
+BURST_MIN = 0.005  # 🔥 5ms (Hardware Limit)
+BURST_MAX = 0.015  # 🔥 15ms
 SESSION_MAX_SEC = 120    
 
 def get_driver(agent_id):
@@ -19,6 +19,7 @@ def get_driver(agent_id):
     options.add_argument("--no-sandbox") 
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    options.add_argument("--disable-v8-idle-tasks") # 🔥 Disables JS pauses
     options.add_argument("--blink-settings=imagesEnabled=false")
     
     mobile = {
@@ -44,41 +45,41 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             box = driver.find_element(By.XPATH, "//div[@role='textbox']|//textarea")
 
             while (time.time() - session_start) < SESSION_MAX_SEC:
-                # 🔄 Generate 2 Unique Blocks in Python to bypass JS randomness overhead
+                # 🔄 Generate 3 Unique Blocks in Python 
                 emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱"]
                 
                 def make_block():
                     line = f"【 {target_name} 】 SAY P R V R बाप {random.choice(emojis)} ________________________/"
                     return "\\n".join([line for _ in range(20)]) + f"\\n⚡ ID: {random.randint(1000, 9999)}"
 
-                block1 = make_block()
-                block2 = make_block()
+                b1, b2, b3 = make_block(), make_block(), make_block()
 
                 try:
-                    # ⚡ DOUBLE-TAP INJECTION
-                    # We send TWO blocks and TWO Enters in ONE single Selenium command.
+                    # ⚡ TRIPLE-TAP INJECTION (The "Slingshot")
                     driver.execute_script("""
                         var el = arguments[0];
-                        var b1 = arguments[1];
-                        var b2 = arguments[2];
+                        var msgs = [arguments[1], arguments[2], arguments[3]];
                         
-                        function fire(txt) {
-                            el.focus();
-                            document.execCommand('insertText', false, txt);
-                            el.dispatchEvent(new KeyboardEvent('keydown', {bubbles:true, key:'Enter', code:'Enter', keyCode:13}));
-                        }
-
-                        fire(b1);
-                        setTimeout(() => { fire(b2); }, 5); // 5ms gap between the double-tap
-                        
-                        // RAM Wipe
-                        setTimeout(() => { if(el) el.innerHTML = ""; }, 15);
-                    """, box, block1, block2)
+                        msgs.forEach((txt, index) => {
+                            setTimeout(() => {
+                                el.focus();
+                                document.execCommand('insertText', false, txt);
+                                // Native Event Dispatcher (Faster than send_keys)
+                                el.dispatchEvent(new KeyboardEvent('keydown', {
+                                    bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
+                                }));
+                                // Small clear to keep the box responsive
+                                if (index === msgs.length - 1) {
+                                    setTimeout(() => { el.innerHTML = ""; }, 10);
+                                }
+                            }, index * 2); // 2ms gap between each block inside the browser
+                        });
+                    """, box, b1, b2, b3)
                     
                 except:
                     break 
                 
-                # ⚡ Nearly zero sleep
+                # ⚡ Absolute minimum thread sleep
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
         except: pass
