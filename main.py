@@ -6,9 +6,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🚀 V112 SATURATION ENGINE ---
+# --- 🚀 V113 GLOBAL MEMORY STRIKER ---
 THREADS = 2 
-STRIKE_SPEED_MS = 20  # 🔥 THE LIMIT: 20ms pulse (50 messages per second)
+STRIKE_SPEED_MS = 15  # 🔥 CRITICAL SPEED: 15ms pulse
 SESSION_MAX_SEC = 120    
 
 def get_driver(agent_id):
@@ -35,49 +35,54 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             driver.get("https://www.instagram.com/")
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+            
+            # Go to chat
             driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-            time.sleep(8) # Allow full Lexical engine load
+            time.sleep(10) # Heavy wait for GitHub CPU to stabilize
 
-            # 🎯 CACHE THE BOX
-            box = driver.find_element(By.XPATH, "//div[@role='textbox']|//textarea")
-
-            # 🔥 THE SATURATION INJECTOR (Recursive Loop)
-            # This starts a process INSIDE Chrome that Python doesn't need to manage.
+            # 🔥 THE REVOLUTIONARY "ID-TAG" INJECTION
+            # This version avoids the "tuple index" error by not using arguments[0] inside the loop
             driver.execute_script(f"""
-                const el = arguments[0];
                 const targetName = "{target_name}";
                 const speed = {STRIKE_SPEED_MS};
                 const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱"];
                 
-                if (window.prvrInterval) clearInterval(window.prvrInterval);
-
-                window.prvrInterval = setInterval(() => {{
-                    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-                    const salt = Math.random().toString(36).substring(7).toUpperCase();
-                    const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ________________________/`;
-                    const block = Array(20).fill(line).join('\\n') + "\\n⚡ ID: " + salt;
-
-                    el.focus();
-                    document.execCommand('insertText', false, block);
+                // 1. Tag the box so we never have to 'find' it again
+                const box = document.querySelector('div[role="textbox"], [contenteditable="true"], textarea');
+                if (box) {{
+                    box.id = "PRVR_BOX_" + Math.random().toString(36).substr(2, 9);
                     
-                    // Native Dispatch (Instant)
-                    const enter = new KeyboardEvent('keydown', {{
-                        bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
-                    }});
-                    el.dispatchEvent(enter);
+                    if (window.prvrInterval) clearInterval(window.prvrInterval);
 
-                    // Immediate DOM Purge to keep RAM 0
-                    setTimeout(() => {{ if(el) el.innerHTML = ""; }}, 5);
-                }}, speed);
-            """, box)
+                    window.prvrInterval = setInterval(() => {{
+                        const el = document.getElementById(box.id);
+                        if (!el) return;
 
-            print(f"[{agent_id}] 🔥 Saturation Engine Engaged at {STRIKE_SPEED_MS}ms", flush=True)
-            
-            # Python just hangs out and keeps the browser alive for 2 minutes
+                        const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+                        const salt = Math.random().toString(36).substring(7).toUpperCase();
+                        const line = `【 ${{targetName}} 】 SAY P R V R बाप ${{emoji}} ________________________/`;
+                        const block = Array(20).fill(line).join('\\n') + "\\n⚡ ID: " + salt;
+
+                        el.focus();
+                        document.execCommand('insertText', false, block);
+                        
+                        // Ultra-Fast Enter Dispatch
+                        el.dispatchEvent(new KeyboardEvent('keydown', {{
+                            bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
+                        }}));
+
+                        // ⚡ Instant RAM Wipe
+                        setTimeout(() => {{ el.innerHTML = ""; }}, 2);
+                    }}, speed);
+                }}
+            """)
+
+            print(f"[{agent_id}] ✅ V113 Striker Live at {STRIKE_SPEED_MS}ms Pulse.", flush=True)
             time.sleep(SESSION_MAX_SEC)
                 
         except Exception as e:
             print(f"⚠️ Error: {e}")
+            time.sleep(5)
         finally:
             if driver: driver.quit()
             gc.collect()
