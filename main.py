@@ -5,13 +5,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🚀 V109 DIRECT-POINTER ENGINE ---
+# --- 🚀 V110 DOUBLE-BUFFERED ENGINE ---
 THREADS = 2 
-BURST_MIN = 0.02  # 🔥 Lowered to 20ms
-BURST_MAX = 0.05 
+BURST_MIN = 0.01  # 🔥 10ms (The absolute floor for Python)
+BURST_MAX = 0.03 
 SESSION_MAX_SEC = 120    
 
 def get_driver(agent_id):
@@ -27,9 +26,6 @@ def get_driver(agent_id):
         "userAgent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36"
     }
     options.add_experimental_option("mobileEmulation", mobile)
-    
-    temp = os.path.join(tempfile.gettempdir(), f"v109_{agent_id}_{int(time.time())}")
-    options.add_argument(f"--user-data-dir={temp}")
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
 def run_life_cycle(agent_id, cookie, target_id, target_name):
@@ -44,28 +40,45 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
             time.sleep(6)
 
-            # 🎯 PRE-CACHING THE BOX (Find it once, use it forever)
+            # 🎯 CACHE THE BOX
             box = driver.find_element(By.XPATH, "//div[@role='textbox']|//textarea")
-            actions = ActionChains(driver)
 
             while (time.time() - session_start) < SESSION_MAX_SEC:
-                # 🔄 Fast Block Generation
+                # 🔄 Generate 2 Unique Blocks in Python to bypass JS randomness overhead
                 emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱"]
-                line = f"【 {target_name} 】 SAY P R V R बाप {random.choice(emojis)} ________________________/"
-                block = "\n".join([line for _ in range(20)]) + f"\n⚡ ID: {random.randint(1000, 9999)}"
                 
+                def make_block():
+                    line = f"【 {target_name} 】 SAY P R V R बाप {random.choice(emojis)} ________________________/"
+                    return "\\n".join([line for _ in range(20)]) + f"\\n⚡ ID: {random.randint(1000, 9999)}"
+
+                block1 = make_block()
+                block2 = make_block()
+
                 try:
-                    # ⚡ DIRECT SLINGSHOT: No "find_element" inside this loop
-                    driver.execute_script("document.execCommand('insertText', false, arguments[0]);", block)
+                    # ⚡ DOUBLE-TAP INJECTION
+                    # We send TWO blocks and TWO Enters in ONE single Selenium command.
+                    driver.execute_script("""
+                        var el = arguments[0];
+                        var b1 = arguments[1];
+                        var b2 = arguments[2];
+                        
+                        function fire(txt) {
+                            el.focus();
+                            document.execCommand('insertText', false, txt);
+                            el.dispatchEvent(new KeyboardEvent('keydown', {bubbles:true, key:'Enter', code:'Enter', keyCode:13}));
+                        }
+
+                        fire(b1);
+                        setTimeout(() => { fire(b2); }, 5); // 5ms gap between the double-tap
+                        
+                        // RAM Wipe
+                        setTimeout(() => { if(el) el.innerHTML = ""; }, 15);
+                    """, box, block1, block2)
                     
-                    # Using ActionChains to hit Enter without refocusing
-                    actions.move_to_element(box).send_keys(Keys.ENTER).perform()
-                    
-                    # Instant RAM Wipe
-                    driver.execute_script("arguments[0].innerHTML = '';", box)
                 except:
                     break 
                 
+                # ⚡ Nearly zero sleep
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
         except: pass
