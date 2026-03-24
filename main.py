@@ -7,14 +7,13 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# --- 🚀 V106 ORIGINAL SPEED PORT ---
+# --- 🚀 V106.1 RAM-FLUSH SPEED PORT ---
 THREADS = 2 
-BURST_MIN = 0.05  # Dropped from 0.08 for faster firing
-BURST_MAX = 0.08 
+BURST_MIN = 0.04  # Pushed to 40ms
+BURST_MAX = 0.07 
 SESSION_MAX_SEC = 120    
 
 sys.stdout.reconfigure(encoding='utf-8')
-COUNTER_LOCK = threading.Lock()
 LAUNCH_LOCK = threading.Lock()
 
 def get_driver(agent_id):
@@ -24,9 +23,7 @@ def get_driver(agent_id):
         options.add_argument("--no-sandbox") 
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-gpu")
-        # ⚡ Disable all UI rendering bloat
         options.add_argument("--blink-settings=imagesEnabled=false")
-        options.add_argument("--disable-extensions")
         
         mobile = {
             "deviceMetrics": { "width": 375, "height": 812, "pixelRatio": 3.0 },
@@ -34,7 +31,7 @@ def get_driver(agent_id):
         }
         options.add_experimental_option("mobileEmulation", mobile)
         
-        temp = os.path.join(tempfile.gettempdir(), f"v106_{agent_id}_{int(time.time())}")
+        temp = os.path.join(tempfile.gettempdir(), f"v106_1_{agent_id}_{int(time.time())}")
         options.add_argument(f"--user-data-dir={temp}")
         
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -49,30 +46,40 @@ def run_life_cycle(agent_id, cookie, target_id, target_name):
             driver = get_driver(agent_id)
             driver.get("https://www.instagram.com/")
             
-            # Login
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # Direct link is faster
             driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
-            time.sleep(5)
+            time.sleep(6) # Essential for initial load
 
-            # --- THE PURE FIRING LOOP ---
             while (time.time() - session_start) < SESSION_MAX_SEC:
-                # 🔄 Fast Block Generation
+                # 🔄 Generate Block
                 emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱"]
                 line = f"【 {target_name} 】 SAY P R V R बाप {random.choice(emojis)} ________________________/"
                 block = "\n".join([line for _ in range(20)]) + f"\n⚡ ID: {random.randint(1000, 9999)}"
                 
-                # ⚡ PURE INJECTION
                 try:
+                    # ⚡ FIND BOX
                     box = driver.find_element(By.XPATH, "//div[@role='textbox']|//textarea")
-                    driver.execute_script("arguments[0].focus();", box)
-                    driver.execute_script("document.execCommand('insertText', false, arguments[0]);", block)
+                    
+                    # ⚡ INSTANT INJECT
+                    driver.execute_script("""
+                        var el = arguments[0];
+                        var txt = arguments[1];
+                        el.focus();
+                        document.execCommand('insertText', false, txt);
+                        
+                        // 🔥 THE RAM FLUSH: Clear internal state after dispatch
+                        setTimeout(() => { if(el) el.innerHTML = ""; }, 5);
+                    """, box, block)
+                    
+                    # ⚡ SEND
                     box.send_keys(Keys.ENTER)
+                    
                 except:
-                    break # Restart if box is lost
+                    break 
                 
+                # ⚡ Minimal sleep to prevent CPU thread lock
                 time.sleep(random.uniform(BURST_MIN, BURST_MAX))
                 
         except Exception as e:
