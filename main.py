@@ -6,8 +6,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
 # --- ⚙️ V100 TUNED SETTINGS ---
-THREADS = 2             # 2 Browsers per machine
-TABS_PER_THREAD = 3     # 3 Tabs per browser (6 Agents total)
+THREADS = 1             # 2 Browsers per machine
+TABS_PER_THREAD = 1     # 3 Tabs per browser (6 Agents total)
 PULSE_DELAY = 100       # 100ms (Hyper-speed)
 
 # ♻️ RESTART CYCLES (As requested)
