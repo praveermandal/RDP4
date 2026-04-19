@@ -54,7 +54,7 @@ def run_agent(agent_id, cookie, target_id, target_name):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
-                # ⚡ CYBER GLITCH ENGINE (Option 7)
+                # ⚡ SHADOW REALM ENGINE (Option 12)
                 driver.execute_script("""
                     const name = arguments[0];
                     const delay = arguments[1];
@@ -62,18 +62,21 @@ def run_agent(agent_id, cookie, target_id, target_name):
                     function getBlock(n) {
                         const flowers = ["🌸", "🌹", "🌷", "🌻", "🌺", "🌼", "💐"];
                         const flo = flowers[Math.floor(Math.random() * flowers.length)];
-                        const glitchLine = "// ────────────── //\\n";
+                        const darkBar = "▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰\\n";
+                        const separator = "──────────────\\n";
                         
-                        // Header: Cyber Brackets + Rotating Flower
-                        let content = `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]\\n`;
+                        // Header: Shadow Moons + Target + Flower
+                        let content = `🌑🌑 (${n}) ${flo} P R V R पापा से CUD 🌑🌑\\n`;
+                        content += darkBar;
                         
-                        // 15 Separator lines in Cyber style
+                        // 15 Separator lines
                         for(let i=0; i<15; i++) { 
-                            content += glitchLine; 
+                            content += separator; 
                         }
                         
-                        // Footer: Same Brackets
-                        content += `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]`;
+                        // Footer: Bar + Shadow Moons
+                        content += darkBar;
+                        content += `🌑🌑 (${n}) ${flo} P R V R पापा से CUD 🌑🌑`;
                         
                         return content;
                     }
@@ -96,7 +99,7 @@ def run_agent(agent_id, cookie, target_id, target_name):
                     }, delay);
                 """, target_name, PULSE_DELAY)
 
-            print(f"🔥 [Agent {agent_id}] Bursting Cyber Layout... (Reset in 120s)")
+            print(f"🔥 [Agent {agent_id}] Bursting Shadow Layout... (Reset in 120s)")
             time.sleep(SESSION_MAX_SEC) 
 
         except Exception as e:
