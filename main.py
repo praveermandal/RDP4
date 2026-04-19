@@ -6,13 +6,13 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
 # --- ⚙️ V100 TUNED SETTINGS ---
-THREADS = 2             # 2 Browsers per machine
-TABS_PER_THREAD = 2     # 3 Tabs per browser (6 Agents total)
-PULSE_DELAY = 100       # 100ms (Hyper-speed)
+THREADS = 2 
+TABS_PER_THREAD = 2 
+PULSE_DELAY = 100 
 
-# ♻️ RESTART CYCLES (As requested)
-SESSION_MAX_SEC = 120   # 2-Minute Restart
-TOTAL_DURATION = 25000  # ~7 Hours
+# ♻️ RESTART CYCLES
+SESSION_MAX_SEC = 120 
+TOTAL_DURATION = 25000 
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -54,18 +54,28 @@ def run_agent(agent_id, cookie, target_id, target_name):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
-                # ⚡ THE JS HYPER-ENGINE (Firing 100ms)
+                # ⚡ CYBER GLITCH ENGINE (Option 7)
                 driver.execute_script("""
                     const name = arguments[0];
                     const delay = arguments[1];
                     
                     function getBlock(n) {
-                        const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️"];
-                        const emo = emojis[Math.floor(Math.random() * emojis.length)];
-                        const line = `【 ${n} 】 SAY P R V R बाप ${emo} ____________________/\\n`;
-                        let block = "";
-                        for(let i=0; i<20; i++) { block += line; }
-                        return block + "\\n⚡ ID: " + Math.random().toString(36).substring(7);
+                        const flowers = ["🌸", "🌹", "🌷", "🌻", "🌺", "🌼", "💐"];
+                        const flo = flowers[Math.floor(Math.random() * flowers.length)];
+                        const glitchLine = "// ────────────── //\\n";
+                        
+                        // Header: Cyber Brackets + Rotating Flower
+                        let content = `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]\\n`;
+                        
+                        // 15 Separator lines in Cyber style
+                        for(let i=0; i<15; i++) { 
+                            content += glitchLine; 
+                        }
+                        
+                        // Footer: Same Brackets
+                        content += `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]`;
+                        
+                        return content;
                     }
 
                     setInterval(() => {
@@ -86,20 +96,20 @@ def run_agent(agent_id, cookie, target_id, target_name):
                     }, delay);
                 """, target_name, PULSE_DELAY)
 
-            print(f"🔥 [Agent {agent_id}] Bursting... (Reset in 120s)")
-            time.sleep(SESSION_MAX_SEC) # 2-Minute Life Cycle
+            print(f"🔥 [Agent {agent_id}] Bursting Cyber Layout... (Reset in 120s)")
+            time.sleep(SESSION_MAX_SEC) 
 
         except Exception as e:
             print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
         finally:
             if driver: driver.quit()
-            gc.collect() # RAM Flush
+            gc.collect() 
             time.sleep(2)
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "EZRA")
+    target_name = os.environ.get("TARGET_NAME", "PRVR") 
 
     if not cookie or not target_id:
         print("❌ Missing Secrets!")
