@@ -9,9 +9,9 @@ SESSION_MAX_SEC = 150
 TOTAL_DURATION = 25000   
 
 async def check_session_validity(page, agent_id):
-    """Kills the runner if the cookie is rejected by Instagram."""
+    """Hard exit if Instagram redirects to login (Session Expired)."""
     if "login" in page.url:
-        print(f"\n❌ [{agent_id}] SESSION EXPIRED. Update your cookie secret!", flush=True)
+        print(f"\n❌ [{agent_id}] SESSION EXPIRED. Check your INSTA_COOKIE secret!", flush=True)
         os._exit(1)
 
 async def run_agent(agent_id, cookie, target_id, target_name):
@@ -33,22 +33,25 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 820, 'height': 1180}
                 )
                 
+                # Cookie Extraction & Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
-                print(f"🔗 [{full_id}] Navigating to Thread...", flush=True)
+                print(f"🔗 [{full_id}] Connecting to Thread: {target_id}", flush=True)
                 
+                # Navigation (DOM loaded is enough for JS injection)
                 await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="domcontentloaded", timeout=60000)
                 await check_session_validity(page, full_id)
 
                 print(f"🔥 [{full_id}] ACTIVE | Pulse: {PULSE_DELAY}ms | Watchdog: {target_name}", flush=True)
 
+                # ⚡ HYPER-SPEED JAVASCRIPT INJECTION
                 await page.evaluate("""
                     ([name, msgDelay, ncDelay]) => {
                         function getBlock(n) {
-                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
+                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
                             let lines = [`🔱 (${n}) 🌸 P R V R पापा से CUD 🔱`];
                             for(let i=0; i<25; i++) lines.push(rail);
                             lines.push(`🔱 (${n}) 🌸 P R V R पापा से CUD 🔱`);
@@ -67,40 +70,48 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             }
                         }, msgDelay);
 
-                        // 🛡️ FORCE TRIGGER NC WATCHDOG
+                        // 🛡️ NC WATCHDOG (SAVE BUTTON OPTIMIZED)
                         setInterval(() => {
                             const header = document.querySelector('header');
                             if (header && !header.innerText.toLowerCase().includes(name.toLowerCase())) {
                                 const clickable = header.querySelector('span, div[role="button"], img');
                                 if (clickable) {
-                                    clickable.click(); // Open Sidebar/Settings
+                                    clickable.click(); // Open Chat Settings
 
                                     setTimeout(() => {
                                         const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"]');
                                         if (input) {
                                             input.focus();
-                                            // Force React State Update
+                                            // Force React state update
                                             const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                            setter.call(input, ""); // Clear
+                                            setter.call(input, ""); 
                                             input.dispatchEvent(new Event('input', { bubbles: true }));
-                                            setter.call(input, name); // Set Target
+                                            setter.call(input, name); 
                                             input.dispatchEvent(new Event('input', { bubbles: true }));
                                             input.dispatchEvent(new Event('change', { bubbles: true }));
 
                                             setTimeout(() => {
-                                                const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
-                                                const done = btns.find(b => {
+                                                const btns = Array.from(document.querySelectorAll('button, div[role="button"], span[role="button"]'));
+                                                
+                                                // 🔍 Search Strategy: 'Save' priority -> 'Done' -> Primary Class
+                                                let actionBtn = btns.find(b => {
                                                     const t = b.innerText.toLowerCase();
-                                                    return t === "done" || t === "save" || t === "save changes";
+                                                    return t.includes("save") || t.includes("done");
                                                 });
-                                                if (done) {
-                                                    done.click();
-                                                    // Safety second click
-                                                    setTimeout(() => { if(document.body.contains(done)) done.click(); }, 300);
+
+                                                // Fallback to primary blue button class if text isn't found
+                                                if (!actionBtn) {
+                                                    actionBtn = btns.find(b => b.classList.contains('_acan') || b.classList.contains('_acap'));
                                                 }
-                                            }, 800);
+
+                                                if (actionBtn) {
+                                                    actionBtn.click();
+                                                    // Double-tap safety
+                                                    setTimeout(() => { if(document.body.contains(actionBtn)) actionBtn.click(); }, 300);
+                                                }
+                                            }, 1000);
                                         }
-                                    }, 1500); 
+                                    }, 2000); 
                                 }
                             }
                         }, ncDelay);
@@ -108,7 +119,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Restarting cycle...", flush=True)
+                print(f"♻️ [{full_id}] Cycle end. Restarting...", flush=True)
                 await context.close()
                 gc.collect()
                 
@@ -124,10 +135,10 @@ async def main():
     target_name = os.environ.get("TARGET_NAME", "PRVR")
 
     if not cookie or not target_id:
-        print("❌ [CRITICAL] Missing GitHub Secrets!", flush=True)
+        print("❌ [CRITICAL] Missing Environment Secrets!", flush=True)
         return
 
-    print(f"💎 CLUSTER NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
+    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
     
     tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)]
     await asyncio.gather(*tasks)
