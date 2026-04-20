@@ -1,11 +1,10 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V16 CORE SETTINGS ---
+# --- ⚙️ V17 PURE SPAM SETTINGS ---
 AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 100        
-NC_CHECK_DELAY = 4000    
-SESSION_MAX_SEC = 250    
+PULSE_DELAY = 100        # 100ms between messages
+SESSION_MAX_SEC = 300    # Reset RAM every 5 minutes
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
@@ -29,91 +28,48 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
+                # Mirror logs
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
-                print(f"🔗 [{full_id}] Connecting via Fast-Commit...", flush=True)
+                print(f"🔗 [{full_id}] Connecting...", flush=True)
                 
-                # CRITICAL: wait_until="commit" stops the 'stuck' behavior
+                # Bypassing the hang with 'commit'
                 try:
                     await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
                 except Exception:
-                    print(f"⚠️ [{full_id}] Connection slow, forcing injection anyway...", flush=True)
+                    pass
 
-                # Brief pause to allow the bare minimum DOM to appear
-                await asyncio.sleep(7)
+                # Wait for the chat box to actually exist
+                await asyncio.sleep(8)
 
                 if "login" in page.url:
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Injection Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Pure Spam Mode", flush=True)
 
-                # ⚡ HYPER-SPEED INJECTION (MESSAGES + URL-JUMP NC)
+                # ⚡ HYPER-SPEED MESSAGE INJECTION
                 await page.evaluate("""
-                    ([targetName, mDelay, nDelay, threadId]) => {
+                    ([targetName, mDelay]) => {
                         function getBlock(n) {
-                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿"; 
+                            const rail = "╿╿╿╿╿╿╿╿"; 
                             return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
                         }
 
                         // 📨 MESSAGE SPAMMER
                         setInterval(() => {
-                            if (window.location.href.includes('/details/')) return;
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
                                 box.focus();
                                 document.execCommand('insertText', false, getBlock(targetName));
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
+                                
+                                // Quick clear for React stabilization
+                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                             }
                         }, mDelay);
-
-                        // 🛡️ NC WATCHDOG (DIRECT URL ATTACK)
-                        let isProcessing = false;
-                        setInterval(() => {
-                            if (isProcessing) return;
-
-                            const titleEl = document.querySelector('header span[role="link"], .x1lliihq.x193iq5w, header h1, header span');
-                            const currentName = titleEl ? titleEl.innerText : "";
-
-                            // 1. Detect mismatch and JUMP
-                            if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase()) && !window.location.href.includes('/details/')) {
-                                isProcessing = true;
-                                console.log("🚀 NC TRIGGERED! Jumping to Details URL...");
-                                window.location.href = `https://www.instagram.com/direct/t/${threadId}/details/`;
-                            }
-
-                            // 2. Details page logic
-                            if (window.location.href.includes('/details/')) {
-                                const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
-                                if (input && input.value !== targetName) {
-                                    console.log("📝 Settings Page Ready. Forcing Name Change...");
-                                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                    setter.call(input, ""); 
-                                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                                    setter.call(input, targetName); 
-                                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                                    
-                                    setTimeout(() => {
-                                        const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
-                                        const save = btns.find(b => /save|done|update/i.test(b.innerText)) || document.querySelector('.x1n2onr6');
-                                        if (save) {
-                                            console.log("🚀 SAVE CLICKED! Returning to chat...");
-                                            save.click();
-                                            setTimeout(() => { 
-                                                window.location.href = `https://www.instagram.com/direct/t/${threadId}/`; 
-                                                isProcessing = false;
-                                            }, 2000);
-                                        }
-                                    }, 1000);
-                                } else if (!input && document.readyState === 'complete') {
-                                    console.log("⚠️ Input missing. Returning to chat...");
-                                    window.location.href = `https://www.instagram.com/direct/t/${threadId}/`;
-                                    isProcessing = false;
-                                }
-                            }
-                        }, nDelay);
                     }
-                """, [target_name, PULSE_DELAY, NC_CHECK_DELAY, target_id])
+                """, [target_name, PULSE_DELAY])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
                 print(f"♻️ [{full_id}] Flushing Context...", flush=True)
