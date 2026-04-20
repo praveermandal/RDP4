@@ -48,7 +48,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 await page.evaluate("""
                     ([targetName, mDelay, nDelay]) => {
                         function getBlock(n) {
-                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
+                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
                             return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
                         }
 
@@ -63,41 +63,51 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             }
                         }, mDelay);
 
-                        // 🛡️ NC WATCHDOG (AGGRESSIVE TARGETING)
+                        // 🛡️ NC WATCHDOG (FIXED & HARDENED)
                         setInterval(() => {
-                            // Target the specific group name container using known 2026 classes
                             const titleEl = document.querySelector('header span[role="link"], .x1lliihq.x193iq5w, header h1, header span');
                             const currentName = titleEl ? titleEl.innerText : "";
 
                             if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
-                                console.log("⚠️ NC TRIGGER: Current name is '" + currentName + "'. Clicking to fix...");
+                                console.log("⚠️ NC MISMATCH! Clicking header to force settings...");
                                 
+                                // Triple-Click Strategy to wake up React
                                 titleEl.click();
+                                setTimeout(() => titleEl.click(), 200);
 
                                 setTimeout(() => {
                                     const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"], .x1i10hfl[type="text"]');
                                     if (input) {
-                                        console.log("📝 Sidebar Open. Injecting '" + targetName + "'...");
+                                        console.log("📝 Settings Open. Forcing NC state...");
+                                        
+                                        // Focus and Hardware-level Clear
+                                        input.focus();
                                         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                        
                                         setter.call(input, ""); 
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        
                                         setter.call(input, targetName); 
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        input.dispatchEvent(new Event('change', { bubbles: true }));
                                         
                                         setTimeout(() => {
-                                            const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
-                                            const save = btns.find(b => /save|done|update/i.test(b.innerText)) || 
-                                                         document.querySelector('._acan, ._acap, .x1n2onr6');
+                                            // Search for ALL possible Save/Done buttons
+                                            const btns = Array.from(document.querySelectorAll('button, div[role="button"], span[role="button"]'));
+                                            const save = btns.find(b => {
+                                                const txt = b.innerText.toLowerCase();
+                                                return txt.includes("save") || txt.includes("done") || txt.includes("update");
+                                            }) || document.querySelector('._acan, ._acap, .x1n2onr6');
                                             
                                             if (save) {
-                                                console.log("🚀 SAVE CLICKED!");
+                                                console.log("🚀 SAVE COMMAND SENT!");
                                                 save.click();
+                                                // Close sidebar if it lingers
+                                                setTimeout(() => { if(document.body.contains(save)) save.click(); }, 300);
                                             } else {
-                                                console.log("❌ Error: Save button not found. Check Admin status.");
+                                                console.log("❌ NC Error: Save button hidden. Are you Admin?");
                                             }
                                         }, 1000);
-                                    } else {
-                                        console.log("❌ Sidebar Error: Name input field not found.");
                                     }
                                 }, 2500);
                             }
@@ -105,14 +115,13 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     }
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
 
-                # Maintain session for 200s to prevent RAM leakage
                 await asyncio.sleep(SESSION_MAX_SEC)
                 print(f"♻️ [{full_id}] Restarting Context...", flush=True)
                 await context.close()
                 gc.collect()
 
             except Exception as e:
-                print(f"⚠️ [{full_id}] Connection Error: {e}. Reconnecting...", flush=True)
+                print(f"⚠️ [{full_id}] Error: {e}. Reconnecting...", flush=True)
                 await asyncio.sleep(5)
 
 async def main():
@@ -121,10 +130,10 @@ async def main():
     target_name = os.environ.get("TARGET_NAME", "PRVR")
 
     if not cookie or not target_id:
-        print("❌ [CRITICAL] Environment Secrets Missing!", flush=True)
+        print("❌ [CRITICAL] Secrets Missing!", flush=True)
         return
 
-    print(f"💎 V100 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
+    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
     
     tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)]
     await asyncio.gather(*tasks)
