@@ -1,18 +1,20 @@
-import os, asyncio, re, sys, gc, random
+import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V25 CHAOS SETTINGS ---
+# --- ⚙️ V26 HIGH-SPEED SETTINGS ---
 AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 100        
-SESSION_MAX_SEC = 21600  # 6 Hours per cycle
+PULSE_DELAY = 100        # Selenium-matching speed
+SESSION_MAX_SEC = 21600  # 6 Hours
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
     full_id = f"M{m_num}-A{agent_id}"
     
     async with async_playwright() as p:
+        # Optimization: Use fixed flags to reduce browser overhead
         browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"
+            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", 
+            "--js-flags='--max-old-space-size=512'"
         ])
         
         while True:
@@ -28,52 +30,48 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 
                 page = await context.new_page()
 
-                # 🛡️ FIXED LOG FILTER
-                def log_filter(msg):
-                    txt = msg.text.lower()
-                    ignore = ["content security policy", "permissions-policy", "selfxss", "bluetooth", "unload", "webassembly", "stop!", "browser feature", "scam"]
-                    if not any(x in txt for x in ignore):
-                        print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True)
-
-                page.on("console", log_filter)
+                # Silence logs to save CPU cycles
+                page.on("console", lambda msg: None) 
 
                 print(f"🔗 [{full_id}] Connecting...", flush=True)
                 try:
-                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
-                except: 
-                    pass
+                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=30000)
+                except: pass
 
-                await asyncio.sleep(8)
+                await asyncio.sleep(7)
                 if "login" in page.url:
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Chaos-Overdrive Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Internal-Burner Engaged", flush=True)
 
+                # ⚡ PURE JAVASCRIPT LOOP (No Python Overhead)
                 await page.evaluate("""
-                    ([targetName, mDelay]) => {
+                    ([tName, mDelay]) => {
                         const lightning = "      ⚡\\n        ⚡\\n          ⚡\\n        ⚡\\n      ⚡\\n".repeat(3);
                         const border = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓";
                         const line = "◢◤ ─────────────────── ◢◤";
                         
-                        const variations = [
-                            (n) => `🔱👑 (${n}) 🌸 P R V R पापा से CUD 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${n}) 🌸 P R V R पापा से CUD 👑🔱`,
-                            (n) => `💀 [${n}] P R V R DADDY IS HERE 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${n}] P R V R DADDY IS HERE 💀`,
-                            (n) => `🔥 (${n}) बोल P R V R पापा ON TOP 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${n}) बोल P R V R पापा ON TOP 🔥`,
-                            (n) => `🥶 [${n}] TERA SYSTEM HANG 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${n}] TERA SYSTEM HANG 🥶`,
-                            (n) => `💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
-                            (n) => `🔪 [${n}] CHUP REH RΔNDI KE 🔪\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔪 [${n}] CHUP REH RΔNDI KE 🔪`,
-                            (n) => `👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺`
+                        const vars = [
+                            `🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱`,
+                            `💀 [${tName}] P R V R DADDY IS HERE 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${tName}] P R V R DADDY IS HERE 💀`,
+                            `🔥 (${tName}) बोल P R V R पापा ON TOP 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${tName}) बोल P R V R पापा ON TOP 🔥`,
+                            `🥶 [${tName}] TERA SYSTEM HANG 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${tName}] TERA SYSTEM HANG 🥶`,
+                            `💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
+                            `🔪 [${tName}] CHUP REH RΔNDI KE 🔪\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔪 [${tName}] CHUP REH RΔNDI KE 🔪`
                         ];
 
                         setInterval(() => {
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
                                 box.focus();
-                                const randomMsg = variations[Math.floor(Math.random() * variations.length)](targetName);
-                                document.execCommand('insertText', false, randomMsg);
+                                const msg = vars[Math.floor(Math.random() * vars.length)];
+                                // Use Direct DOM Injection - much faster than typing
+                                document.execCommand('insertText', false, msg);
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
+                                
+                                // Micro-cleanup to prevent UI lag
+                                if(box.innerText.length > 50) box.innerHTML = "";
                             }
                         }, mDelay);
                     }
@@ -91,9 +89,7 @@ async def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR")
-    if not cookie or not target_id: 
-        print("❌ Secrets missing!")
-        return
+    if not cookie or not target_id: return
     print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
     await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
 
