@@ -1,11 +1,11 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V14 IRON-STRIKE SETTINGS ---
+# --- ⚙️ V15 CORE SETTINGS ---
 AGENTS_PER_MACHINE = 2   
 PULSE_DELAY = 100        
-NC_CHECK_DELAY = 3000    
-SESSION_MAX_SEC = 200    
+NC_CHECK_DELAY = 4000    # Slightly slower to allow page loads
+SESSION_MAX_SEC = 250    
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
@@ -29,8 +29,6 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
-                
-                # 📢 MIRROR BROWSER LOGS TO TERMINAL
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
                 print(f"🔗 [{full_id}] Connecting...", flush=True)
@@ -40,11 +38,11 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Clusters Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Direct-Path Engaged", flush=True)
 
-                # ⚡ HYPER-SPEED INJECTION (MESSAGES + COORDINATE NC)
+                # ⚡ HYPER-SPEED INJECTION (MESSAGES + URL-JUMP NC)
                 await page.evaluate("""
-                    ([targetName, mDelay, nDelay]) => {
+                    ([targetName, mDelay, nDelay, threadId]) => {
                         function getBlock(n) {
                             const rail = "╿╿╿╿╿╿╿╿╿╿╿╿"; 
                             return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
@@ -52,16 +50,16 @@ async def run_agent(agent_id, cookie, target_id, target_name):
 
                         // 📨 MESSAGE SPAMMER
                         setInterval(() => {
+                            if (window.location.href.includes('/details/')) return;
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
                                 box.focus();
                                 document.execCommand('insertText', false, getBlock(targetName));
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                             }
                         }, mDelay);
 
-                        // 🛡️ NC WATCHDOG (COORDINATE STRIKE)
+                        // 🛡️ NC WATCHDOG (DIRECT URL ATTACK)
                         let isProcessing = false;
                         setInterval(() => {
                             if (isProcessing) return;
@@ -69,67 +67,45 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             const titleEl = document.querySelector('header span[role="link"], .x1lliihq.x193iq5w, header h1, header span');
                             const currentName = titleEl ? titleEl.innerText : "";
 
-                            if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
+                            // 1. Detect mismatch and JUMP
+                            if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase()) && !window.location.href.includes('/details/')) {
                                 isProcessing = true;
-                                console.log("⚠️ NC MISMATCH! Calculating coordinates for strike...");
-                                
-                                try {
-                                    const rect = titleEl.getBoundingClientRect();
-                                    const x = rect.left + rect.width / 2;
-                                    const y = rect.top + rect.height / 2;
+                                console.log("🚀 NC TRIGGERED! Jumping to Details URL...");
+                                window.location.href = `https://www.instagram.com/direct/t/${threadId}/details/`;
+                            }
+
+                            // 2. We are on details page, FIX it
+                            if (window.location.href.includes('/details/')) {
+                                const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
+                                if (input && input.value !== targetName) {
+                                    console.log("📝 Settings Page Ready. Forcing Name Change...");
+                                    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                    setter.call(input, ""); 
+                                    input.dispatchEvent(new Event('input', { bubbles: true }));
+                                    setter.call(input, targetName); 
+                                    input.dispatchEvent(new Event('input', { bubbles: true }));
                                     
-                                    // Trigger hardware-level mouse events to bypass "dead" clicks
-                                    const events = ['mousedown', 'mouseup', 'click'];
-                                    events.forEach(type => {
-                                        titleEl.dispatchEvent(new MouseEvent(type, {
-                                            view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
-                                        }));
-                                    });
-                                    console.log("🎯 Strike sent to X:" + Math.round(x) + " Y:" + Math.round(y));
-                                } catch(e) {
-                                    titleEl.click(); 
-                                }
-
-                                let attempts = 0;
-                                const checkSidebar = setInterval(() => {
-                                    const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
-                                    attempts++;
-
-                                    if (input) {
-                                        clearInterval(checkSidebar);
-                                        console.log("📝 Sidebar detected! Injecting...");
-                                        
-                                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                        setter.call(input, ""); 
-                                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                                        setter.call(input, targetName); 
-                                        input.dispatchEvent(new Event('input', { bubbles: true }));
-                                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                                        
-                                        setTimeout(() => {
-                                            const btns = Array.from(document.querySelectorAll('button, div[role="button"], span[role="button"]'));
-                                            const save = btns.find(b => /save|done|update/i.test(b.innerText)) || 
-                                                         document.querySelector('._acan, ._acap, .x1n2onr6');
-                                            
-                                            if (save) {
-                                                console.log("🚀 SAVE EXECUTED!");
-                                                save.click();
-                                                setTimeout(() => { isProcessing = false; }, 3000); 
-                                            } else {
-                                                console.log("❌ Save button missing. Check Admin permissions.");
+                                    setTimeout(() => {
+                                        const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
+                                        const save = btns.find(b => /save|done|update/i.test(b.innerText)) || document.querySelector('.x1n2onr6');
+                                        if (save) {
+                                            console.log("🚀 SAVE CLICKED! Returning to chat...");
+                                            save.click();
+                                            setTimeout(() => { 
+                                                window.location.href = `https://www.instagram.com/direct/t/${threadId}/`; 
                                                 isProcessing = false;
-                                            }
-                                        }, 1000);
-                                    } else if (attempts > 20) { 
-                                        clearInterval(checkSidebar);
-                                        console.log("❌ Sidebar timed out. Re-polling...");
-                                        isProcessing = false;
-                                    }
-                                }, 400);
+                                            }, 1500);
+                                        }
+                                    }, 1000);
+                                } else if (!input && document.readyState === 'complete') {
+                                    console.log("⚠️ Input missing (Check Admin). Returning to chat...");
+                                    window.location.href = `https://www.instagram.com/direct/t/${threadId}/`;
+                                    isProcessing = false;
+                                }
                             }
                         }, nDelay);
                     }
-                """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
+                """, [target_name, PULSE_DELAY, NC_CHECK_DELAY, target_id])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
                 print(f"♻️ [{full_id}] Flushing RAM...", flush=True)
