@@ -1,88 +1,29 @@
-name: Phoenix V100 (5-Machine Matrix)
-
+name: V100 Playwright Runner
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '0 */6 * * *'
 
 jobs:
-  run-loop:
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
-    strategy:
-      matrix:
-        machine-id: [1, 2, 3, 4, 5, 6, 7, 8]
-      fail-fast: false
-
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Install Dependencies
-      run: |
-        pip install selenium==4.9.0 selenium-stealth webdriver-manager
-
-    - name: 🔥 Run Phoenix Engine
-      env:
-        INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
-        TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        TARGET_NAME: ${{ secrets.TARGET_NAME }}
-        MACHINE_INDEX: ${{ matrix.machine-id }}
-      run: |
-        python main.py
-        while true; do
-          python -u main.py
-          echo "⚠️ Engine Exit. Respawning in 5s..."
-          sleep 5
-        done
-        python main.py        while true; do
-          python -u main.py
-          echo "⚠️ Engine Exit. Respawning in 5s..."
-          sleep 5
-        done
-
-    - name: 🔥 Run Phoenix Engine (Machine ${{ matrix.machine-id }})
-      env:
-        PYTHONIOENCODING: utf-8
-        INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
-        TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
-        MESSAGES: ${{ secrets.MESSAGES }}
-        MACHINE_INDEX: ${{ matrix.machine-id }} # Passes the ID to your script if needed
-      run: |
-        while true; do
-          echo "🚀 Starting Linux Turbo Engine on Machine #${MACHINE_INDEX}..."
-          
-          if python main.py; then
-            echo "✅ Script finished naturally."
-          else
-            echo "❌ Script crashed internally."
-          fi
-          
-          echo "⚠️ Crash Detected. Respawning in 10 seconds..."
-          sleep 10
-        done
-          MACHINE_INDEX: ${{ matrix.machine-id }}
+      - name: Install System Dependencies
         run: |
-          # STAGGERED START: Spacing out the 5 machines to prevent IP flag
-          DELAY=$(( (MACHINE_INDEX - 1) * 15 ))
-          echo "⏳ Machine #${MACHINE_INDEX} waiting ${DELAY}s for slot..."
-          sleep $DELAY
+          pip install playwright
+          # This is the part that usually hangs in Python; we run it here instead
+          playwright install chromium
+          sudo playwright install-deps chromium 
 
-          while true; do
-            echo "🚀 Starting Hybrid JS-Engine..."
-            
-            # We use -u for unbuffered logs so you see the "✅ Tab Active" messages instantly
-            if python -u main.py; then
-              echo "♻️ Purge Cycle Complete. Restarting..."
-            else
-              echo "❌ Engine Crash Detected."
-            fi
-            
-            echo "⚠️ Cooling down for 10s..."
-            sleep 10
-          done
+      - name: Run Script
+        env:
+          INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
+          TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
+          TARGET_NAME: ${{ secrets.TARGET_NAME }}
+        run: python main.py
