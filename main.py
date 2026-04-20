@@ -10,9 +10,10 @@ def bootstrap():
         subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
     
     print("🌐 Installing Chromium and Linux Dependencies...")
+    # This installs the browser engine
     subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
-    # install-deps is required for Linux/GitHub runners to handle system libraries
-    subprocess.check_call([sys.executable, "-m", "playwright", "install-deps"])
+    # This installs Linux system libraries (libgbm, libnss, etc.) required for headless
+    subprocess.check_call([sys.executable, "-m", "playwright", "install-deps", "chromium"])
     print("✅ System Ready!")
 
 # Run bootstrap before anything else
@@ -21,23 +22,24 @@ bootstrap()
 from playwright.async_api import async_playwright
 
 # --- ⚙️ V100 SETTINGS ---
-AGENTS = 2               
-PULSE_DELAY = 100        
-NC_CHECK_DELAY = 5000    
-SESSION_MAX_SEC = 120    
+AGENTS = 2               # Parallel agents
+PULSE_DELAY = 100        # Messaging speed (ms)
+NC_CHECK_DELAY = 5000    # Name Change check speed (5s)
+SESSION_MAX_SEC = 120    # 2-Minute Flush for RAM stability
 TOTAL_DURATION = 25000   
 
 async def check_session_validity(page):
     """Stops the action if the session ID is expired or invalid."""
     if "login" in page.url:
-        print("❌ [CRITICAL] Session ID Expired or Invalid! Stopping Action...")
+        print("\n❌ [CRITICAL] Session ID Expired or Invalid! Stopping Action...")
         os._exit(1) # Hard exit to stop GitHub runner immediately
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     start_time = asyncio.get_event_loop().time()
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        # Launch Chromium with V100 optimized args
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
         
         while (asyncio.get_event_loop().time() - start_time) < TOTAL_DURATION:
             try:
@@ -46,19 +48,21 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 820, 'height': 1180}
                 )
                 
+                # Extract and Inject Cookie
                 sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
                 print(f"🔗 [Agent {agent_id}] Connecting to Thread: {target_id}...")
                 
-                await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="networkidle")
+                await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="domcontentloaded")
                 
-                # Check if we got redirected to login
+                # Check for redirection (indicates dead cookie)
                 await check_session_validity(page)
 
-                print(f"🔥 [Agent {agent_id}] Status: ACTIVE | Target: {target_name} | Speed: {PULSE_DELAY}ms")
+                print(f"🔥 [Agent {agent_id}] Status: ACTIVE | Target: {target_name} | Pulse: {PULSE_DELAY}ms")
 
+                # Injected JavaScript for high-speed loops
                 await page.evaluate("""
                     const targetName = arguments[0];
                     const msgDelay = arguments[1];
@@ -78,7 +82,9 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                         if (box) {
                             box.focus();
                             document.execCommand('insertText', false, getBlock(targetName));
-                            box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
+                            const enter = new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 });
+                            box.dispatchEvent(enter);
+                            // Cleanup input to prevent DOM bloat
                             setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                         }
                     }, msgDelay);
@@ -97,7 +103,8 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                         setter.call(input, targetName);
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
                                         setTimeout(() => {
-                                            const done = Array.from(document.querySelectorAll('button')).find(b => /Done|Save/.test(b.innerText));
+                                            const btns = Array.from(document.querySelectorAll('button'));
+                                            const done = btns.find(b => /Done|Save/.test(b.innerText));
                                             if (done) done.click();
                                         }, 500);
                                     }
@@ -108,25 +115,26 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 """, target_name, PULSE_DELAY, NC_CHECK_DELAY)
 
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [Agent {agent_id}] Cycle Complete. Flushing RAM...")
+                print(f"♻️ [Agent {agent_id}] Cycle Complete. Flushing context...")
                 await context.close()
                 
             except Exception as e:
-                print(f"⚠️ [Agent {agent_id}] Error: {e}")
+                print(f"⚠️ [Agent {agent_id}] Loop Error: {e}")
                 await asyncio.sleep(5)
         
         await browser.close()
 
 async def main():
+    # Secrets from environment
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR")
 
     if not cookie:
-        print("❌ ERROR: INSTA_COOKIE not found in Secrets!")
+        print("❌ ERROR: INSTA_COOKIE not found. Action aborted.")
         return
 
-    print(f"💎 STARTING V100 MULTI-AGENT SYSTEM...")
+    print(f"💎 V100 SYSTEM STARTING | {AGENTS} Agents | 25-Line Solid Rail")
     tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS)]
     await asyncio.gather(*tasks)
 
