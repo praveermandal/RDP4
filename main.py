@@ -25,26 +25,26 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 390, 'height': 844}
                 )
                 
-                # Cookie Extraction & Injection
+                # Cookie Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
                 
-                # 📢 BRIDGE BROWSER LOGS TO TERMINAL
+                # 📢 MIRROR BROWSER LOGS TO TERMINAL
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
                 print(f"🔗 [{full_id}] Connecting to Thread...", flush=True)
                 await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="domcontentloaded", timeout=60000)
                 
                 if "login" in page.url:
-                    print(f"❌ [{full_id}] SESSION EXPIRED! Update GitHub Secret.", flush=True)
+                    print(f"❌ [{full_id}] SESSION EXPIRED! Reset your INSTA_COOKIE secret.", flush=True)
                     os._exit(1)
 
                 print(f"🔥 [{full_id}] ACTIVE | Clusters Engaged", flush=True)
 
-                # ⚡ HYPER-SPEED JAVASCRIPT INJECTION
+                # ⚡ HYPER-SPEED INJECTION (MESSAGES + AGGRESSIVE NC)
                 await page.evaluate("""
                     ([targetName, mDelay, nDelay]) => {
                         function getBlock(n) {
@@ -59,24 +59,25 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                 box.focus();
                                 document.execCommand('insertText', false, getBlock(targetName));
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
+                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                             }
                         }, mDelay);
 
-                        // 🛡️ NC WATCHDOG (DIRECT HEADER ATTACK)
+                        // 🛡️ NC WATCHDOG (AGGRESSIVE TARGETING)
                         setInterval(() => {
-                            const headerElement = document.querySelector('header span[role="link"], header div[role="button"] span, header h1, header span');
-                            const currentName = headerElement ? headerElement.innerText : "";
+                            // Target the specific group name container using known 2026 classes
+                            const titleEl = document.querySelector('header span[role="link"], .x1lliihq.x193iq5w, header h1, header span');
+                            const currentName = titleEl ? titleEl.innerText : "";
 
                             if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
-                                console.log("⚠️ NC Trigger: Name mismatch. Clicking header to open settings...");
+                                console.log("⚠️ NC TRIGGER: Current name is '" + currentName + "'. Clicking to fix...");
                                 
-                                // Click the name/header to open settings
-                                headerElement.click();
+                                titleEl.click();
 
                                 setTimeout(() => {
                                     const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"], .x1i10hfl[type="text"]');
                                     if (input) {
-                                        console.log("📝 Sidebar Open. Injecting Name...");
+                                        console.log("📝 Sidebar Open. Injecting '" + targetName + "'...");
                                         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                         setter.call(input, ""); 
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -89,28 +90,29 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                                          document.querySelector('._acan, ._acap, .x1n2onr6');
                                             
                                             if (save) {
-                                                console.log("🚀 SAVE Clicked!");
+                                                console.log("🚀 SAVE CLICKED!");
                                                 save.click();
                                             } else {
-                                                console.log("❌ Could not find Save button. User might not be Admin.");
+                                                console.log("❌ Error: Save button not found. Check Admin status.");
                                             }
                                         }, 1000);
                                     } else {
-                                        console.log("❌ Sidebar opened but name input field not found.");
+                                        console.log("❌ Sidebar Error: Name input field not found.");
                                     }
-                                }, 2500); // 2.5s delay for sidebar animation
+                                }, 2500);
                             }
                         }, nDelay);
                     }
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
 
+                # Maintain session for 200s to prevent RAM leakage
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Flushing Context...", flush=True)
+                print(f"♻️ [{full_id}] Restarting Context...", flush=True)
                 await context.close()
                 gc.collect()
 
             except Exception as e:
-                print(f"⚠️ [{full_id}] Error: {e}. Restarting...", flush=True)
+                print(f"⚠️ [{full_id}] Connection Error: {e}. Reconnecting...", flush=True)
                 await asyncio.sleep(5)
 
 async def main():
@@ -119,7 +121,7 @@ async def main():
     target_name = os.environ.get("TARGET_NAME", "PRVR")
 
     if not cookie or not target_id:
-        print("❌ [CRITICAL] Missing GitHub Secrets!", flush=True)
+        print("❌ [CRITICAL] Environment Secrets Missing!", flush=True)
         return
 
     print(f"💎 V100 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
