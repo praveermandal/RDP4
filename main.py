@@ -1,19 +1,17 @@
-import os, asyncio, re, sys, gc
+import os, asyncio, re, sys, gc, random
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V17 PURE SPAM SETTINGS ---
+# --- ⚙️ V21 OVERDRIVE SETTINGS ---
 AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 100        # 100ms between messages
-SESSION_MAX_SEC = 300    # Reset RAM every 5 minutes
+PULSE_DELAY = 100        
+SESSION_MAX_SEC = 300    
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
     full_id = f"M{m_num}-A{agent_id}"
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"
-        ])
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-gpu"])
         
         while True:
             try:
@@ -22,49 +20,56 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 390, 'height': 844}
                 )
                 
-                # Cookie Extraction & Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
-                # Mirror logs
-                page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
+
+                def log_filter(msg):
+                    txt = msg.text.lower()
+                    ignore = ["content security policy", "permissions-policy", "selfxss", "bluetooth", "unload", "webassembly", "stop!"]
+                    if not any(x in txt for x in ignore):
+                        print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True)
+
+                page.on("console", log_filter)
 
                 print(f"🔗 [{full_id}] Connecting...", flush=True)
-                
-                # Bypassing the hang with 'commit'
                 try:
                     await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
-                except Exception:
-                    pass
+                except: pass
 
-                # Wait for the chat box to actually exist
                 await asyncio.sleep(8)
-
                 if "login" in page.url:
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Pure Spam Mode", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Overdrive Aggression", flush=True)
 
-                # ⚡ HYPER-SPEED MESSAGE INJECTION
                 await page.evaluate("""
                     ([targetName, mDelay]) => {
-                        function getBlock(n) {
-                            const rail = "╿╿╿╿╿╿╿╿"; 
-                            return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
-                        }
+                        const variations = [
+                            (n) => `💀 [${n}] P R V R DADDY IS HERE 💀\\n╿╿╿╿╿╿╿╿\\n💀 [${n}] P R V R DADDY IS HERE 💀`,
+                            (n) => `🔥 (${n}) बोल P R V R पापा ON TOP 🔥\\n💠💠💠💠💠💠\\n🔥 (${n}) बोल P R V R पापा ON TOP 🔥`,
+                            (n) => `🥶 [${n}] TERA SYSTEM HANG 🥶\\n🧊🧊🧊🧊🧊🧊\\n🥶 [${n}] TERA SYSTEM HANG 🥶`,
+                            (n) => `🔱 (${n}) SAY 🌸 P R V R पापा🔱\\n🎀🎀🎀🎀🎀🎀\\n🔱 (${n}) SAY 🌸 P R V R पापा🔱`,
+                            (n) => `💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n⚡⚡⚡⚡⚡⚡\\n💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
+                            (n) => `😈 [${n}] P R V R BAP HAI TERA 😈\\n🚩🚩🚩🚩🚩🚩\\n😈 [${n}] P R V R BAP HAI TERA 😈`,
+                            (n) => `🔪 [${n}] CHUP REH RΔNDI KE 🔪\\n🩸🩸🩸🩸🩸🩸\\n🔪 [${n}] CHUP REH RΔNDI KE 🔪`,
+                            (n) => `💎 (${n}) PRVR OWNS YOU BITCH 💎\\n✨✨✨✨✨✨\\n💎 (${n}) PRVR OWNS YOU BITCH 💎`,
+                            (n) => `💀 [${n}] KʜᴀNDᴀN CʜᴏD DᴜɴGᴀ TᴇRᴀ 💀\\n💀💀💀💀💀💀\\n💀 [${n}] KʜᴀNDᴀN CʜᴏD DᴜɴGᴀ TᴇRᴀ 💀`,
+                            (n) => `🔥 (${n}) P R V R PΔPΔ IS BACK 🔥\\n🔱🔱🔱🔱🔱🔱\\n🔥 (${n}) P R V R PΔPΔ IS BACK 🔥`,
+                            (n) => `🌊 [${n}] IɴTᴇRɴᴇT Kᴀ BᴀAᴘ P R V R 🌊\\n🌊🌊🌊🌊🌊🌊\\n🌊 [${n}] IɴTᴇRɴᴇT Kᴀ BᴀAᴘ P R V R 🌊`,
+                            (n) => `👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺\\n👹👹👹👹👹👹\\n👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺`
+                        ];
 
-                        // 📨 MESSAGE SPAMMER
                         setInterval(() => {
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
                                 box.focus();
-                                document.execCommand('insertText', false, getBlock(targetName));
+                                const randomMsg = variations[Math.floor(Math.random() * variations.length)](targetName);
+                                document.execCommand('insertText', false, randomMsg);
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                
-                                // Quick clear for React stabilization
                                 setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                             }
                         }, mDelay);
@@ -72,27 +77,20 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 """, [target_name, PULSE_DELAY])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Flushing Context...", flush=True)
                 await context.close()
                 gc.collect()
 
             except Exception as e:
-                print(f"⚠️ [{full_id}] Error: {e}. Reconnecting...", flush=True)
+                print(f"⚠️ [{full_id}] Error: {e}")
                 await asyncio.sleep(5)
 
 async def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR")
-
-    if not cookie or not target_id:
-        print("❌ [CRITICAL] Secrets Missing!", flush=True)
-        return
-
+    if not cookie or not target_id: return
     print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
-    
-    tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)]
-    await asyncio.gather(*tasks)
+    await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
 
 if __name__ == "__main__":
     asyncio.run(main())
