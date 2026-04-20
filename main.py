@@ -1,151 +1,134 @@
-import os, time, re, random, threading, gc, sys
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium_stealth import stealth
+import os, asyncio, re, sys, subprocess
 
-# --- ⚙️ V100 TUNED SETTINGS ---
-THREADS = 2             # 2 Browsers per machine
-TABS_PER_THREAD = 2     # 2 Tabs per browser (4 Agents total)
-PULSE_DELAY = 100       # 100ms (Hyper-speed)
-
-# ♻️ RESTART CYCLES
-SESSION_MAX_SEC = 120   # 2-Minute Restart to flush RAM
-TOTAL_DURATION = 25000  # ~7 Hours total run time
-
-sys.stdout.reconfigure(encoding='utf-8')
-
-def get_driver():
-    options = Options()
-    options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--blink-settings=imagesEnabled=false")
-    options.page_load_strategy = 'eager'
-    options.add_experimental_option("mobileEmulation", {"deviceName": "iPad Pro"})
+# --- 🛠️ AUTO-INSTALLER (BOOTSTRAP) ---
+def bootstrap():
+    print("🛠️ Starting System Bootstrap...")
+    try:
+        import playwright
+    except ImportError:
+        print("📦 Playwright not found. Installing...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "playwright"])
     
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    
-    # Stealth to bypass detection on Linux/GitHub Runners
-    stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
-    return driver
+    print("🌐 Installing Chromium and Linux Dependencies...")
+    subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+    # install-deps is required for Linux/GitHub runners to handle system libraries
+    subprocess.check_call([sys.executable, "-m", "playwright", "install-deps"])
+    print("✅ System Ready!")
 
-def run_agent(agent_id, cookie, target_id, target_name):
-    global_start = time.time()
-    
-    while (time.time() - global_start) < TOTAL_DURATION:
-        driver = None
-        try:
-            print(f"🚀 [Agent {agent_id}] Starting 2-Min Cycle...")
-            driver = get_driver()
-            driver.get("https://www.instagram.com/")
-            
-            # Cookie Injection Logic
-            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
-            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
-            
-            # Launch Multi-Tabs for maximum impact
-            for _ in range(TABS_PER_THREAD):
-                driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
-                time.sleep(2)
+# Run bootstrap before anything else
+bootstrap()
 
-            handles = driver.window_handles[1:]
-            for handle in handles:
-                driver.switch_to.window(handle)
+from playwright.async_api import async_playwright
+
+# --- ⚙️ V100 SETTINGS ---
+AGENTS = 2               
+PULSE_DELAY = 100        
+NC_CHECK_DELAY = 5000    
+SESSION_MAX_SEC = 120    
+TOTAL_DURATION = 25000   
+
+async def check_session_validity(page):
+    """Stops the action if the session ID is expired or invalid."""
+    if "login" in page.url:
+        print("❌ [CRITICAL] Session ID Expired or Invalid! Stopping Action...")
+        os._exit(1) # Hard exit to stop GitHub runner immediately
+
+async def run_agent(agent_id, cookie, target_id, target_name):
+    start_time = asyncio.get_event_loop().time()
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox"])
+        
+        while (asyncio.get_event_loop().time() - start_time) < TOTAL_DURATION:
+            try:
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)",
+                    viewport={'width': 820, 'height': 1180}
+                )
                 
-                # ⚡ THE "GLITCH PILLAR" ENGINE (V12 DESIGN)
-                driver.execute_script("""
-                    const name = arguments[0];
-                    const delay = arguments[1];
-                    
+                sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
+                await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
+                
+                page = await context.new_page()
+                print(f"🔗 [Agent {agent_id}] Connecting to Thread: {target_id}...")
+                
+                await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="networkidle")
+                
+                # Check if we got redirected to login
+                await check_session_validity(page)
+
+                print(f"🔥 [Agent {agent_id}] Status: ACTIVE | Target: {target_name} | Speed: {PULSE_DELAY}ms")
+
+                await page.evaluate("""
+                    const targetName = arguments[0];
+                    const msgDelay = arguments[1];
+                    const ncDelay = arguments[2];
+
                     function getBlock(n) {
-                        const flowers = ["🌸", "🌹", "🌷", "🌻", "🌺", "🌼", "💐"];
-                        const flo = flowers[Math.floor(Math.random() * flowers.length)];
-                        
-                        const glitchLine = "  ◢◤ ──────────────────── ◢◤\\n";
-                        const heavyBar = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\\n";
-                        
-                        // Header
-                        let content = `🔱👑 (${n}) ${flo} P R V R पापा से CUD 👑🔱\\n`;
-                        content += heavyBar;
-                        content += glitchLine;
-                        
-                        // 15 Staggered Vertical Blocks (The "Waterfall" Effect)
-                        for(let i=0; i<15; i++) { 
-                            let baseIndent = "     ";
-                            let stagger = "";
-                            let pattern = i % 4; 
-                            
-                            if (pattern === 1) stagger = "  ";
-                            else if (pattern === 2) stagger = "    ";
-                            else if (pattern === 3) stagger = "  ";
-                            
-                            content += `${baseIndent}${stagger}⚡\\n`; 
-                        }
-                        
-                        // Footer
-                        content += glitchLine;
-                        content += heavyBar;
-                        content += `🔱👑 (${n}) ${flo} P R V R पापा से CUD 👑🔱`;
-                        
-                        return content;
+                        const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
+                        let lines = [`🔱 (${n}) 🌸 P R V R पापा से CUD 🔱`];
+                        for(let i=0; i<25; i++) lines.push(rail);
+                        lines.push(`🔱 (${n}) 🌸 P R V R पापा से CUD 🔱`);
+                        return lines.join('\\n');
                     }
 
+                    // SPAMMER ENGINE
                     setInterval(() => {
                         const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                         if (box) {
-                            const text = getBlock(name);
                             box.focus();
-                            
-                            // Core injection command
-                            document.execCommand('insertText', false, text);
-                            box.dispatchEvent(new Event('input', { bubbles: true }));
-
-                            // Fire Enter key
-                            const enter = new KeyboardEvent('keydown', {
-                                bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
-                            });
-                            box.dispatchEvent(enter);
-                            
-                            // Clear text residue to prevent overlap
+                            document.execCommand('insertText', false, getBlock(targetName));
+                            box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
                             setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                         }
-                    }, delay);
-                """, target_name, PULSE_DELAY)
+                    }, msgDelay);
 
-            print(f"🔥 [Agent {agent_id}] Bursting Glitch Layout... (2-Min Burst)")
-            time.sleep(SESSION_MAX_SEC) 
+                    // NC WATCHDOG ENGINE
+                    setInterval(() => {
+                        const header = document.querySelector('header');
+                        if (header && !header.innerText.includes(targetName)) {
+                            const clickable = header.querySelector('span, div[role="button"]');
+                            if (clickable) {
+                                clickable.click();
+                                setTimeout(() => {
+                                    const input = document.querySelector('input[name="thread_name"]');
+                                    if (input) {
+                                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                        setter.call(input, targetName);
+                                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        setTimeout(() => {
+                                            const done = Array.from(document.querySelectorAll('button')).find(b => /Done|Save/.test(b.innerText));
+                                            if (done) done.click();
+                                        }, 500);
+                                    }
+                                }, 1200);
+                            }
+                        }
+                    }, ncDelay);
+                """, target_name, PULSE_DELAY, NC_CHECK_DELAY)
 
-        except Exception as e:
-            print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
-        finally:
-            if driver:
-                driver.quit()
-            gc.collect() # RAM Flush for V100 efficiency
-            time.sleep(2)
+                await asyncio.sleep(SESSION_MAX_SEC)
+                print(f"♻️ [Agent {agent_id}] Cycle Complete. Flushing RAM...")
+                await context.close()
+                
+            except Exception as e:
+                print(f"⚠️ [Agent {agent_id}] Error: {e}")
+                await asyncio.sleep(5)
+        
+        await browser.close()
 
-def main():
-    # Fetching secrets from GitHub Environment
+async def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "PRVR") 
+    target_name = os.environ.get("TARGET_NAME", "PRVR")
 
-    if not cookie or not target_id:
-        print("❌ Missing Secrets! Check GitHub Action Secrets.")
+    if not cookie:
+        print("❌ ERROR: INSTA_COOKIE not found in Secrets!")
         return
 
-    threads = []
-    for i in range(THREADS):
-        t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id, target_name))
-        t.start()
-        threads.append(t)
-        time.sleep(10) # Staggered startup to avoid login blocks
-
-    for t in threads:
-        t.join()
+    print(f"💎 STARTING V100 MULTI-AGENT SYSTEM...")
+    tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS)]
+    await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
