@@ -4,15 +4,14 @@ from playwright.async_api import async_playwright
 # --- ⚙️ V100 CLUSTER SETTINGS ---
 AGENTS_PER_MACHINE = 2   
 PULSE_DELAY = 100        
-NC_CHECK_DELAY = 3000    # Check every 3 seconds
-SESSION_MAX_SEC = 200    # Flush RAM every 3.3 minutes
+NC_CHECK_DELAY = 3000    
+SESSION_MAX_SEC = 200    
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
     full_id = f"M{m_num}-A{agent_id}"
     
     async with async_playwright() as p:
-        # Optimized launch for server-side headless
         browser = await p.chromium.launch(headless=True, args=[
             "--no-sandbox", 
             "--disable-dev-shm-usage", 
@@ -33,7 +32,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 
                 page = await context.new_page()
                 
-                # 📢 LIVE BROWSER LOGS TO TERMINAL
+                # 📢 BRIDGE BROWSER LOGS TO TERMINAL
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
                 print(f"🔗 [{full_id}] Connecting to Thread...", flush=True)
@@ -43,7 +42,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     print(f"❌ [{full_id}] SESSION EXPIRED! Update GitHub Secret.", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Injection Running...", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Clusters Engaged", flush=True)
 
                 # ⚡ HYPER-SPEED JAVASCRIPT INJECTION
                 await page.evaluate("""
@@ -53,7 +52,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
                         }
 
-                        // 📨 SPAMMER ENGINE
+                        // 📨 MESSAGE SPAMMER
                         setInterval(() => {
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
@@ -63,71 +62,55 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             }
                         }, mDelay);
 
-                        // 🛡️ NC WATCHDOG (NUCLEAR COORDINATE ATTACK)
+                        // 🛡️ NC WATCHDOG (DIRECT HEADER ATTACK)
                         setInterval(() => {
-                            const header = document.querySelector('header');
-                            if (header && !header.innerText.toLowerCase().includes(targetName.toLowerCase())) {
-                                console.log("⚠️ NC Triggered! Searching for Details button...");
+                            const headerElement = document.querySelector('header span[role="link"], header div[role="button"] span, header h1, header span');
+                            const currentName = headerElement ? headerElement.innerText : "";
+
+                            if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
+                                console.log("⚠️ NC Trigger: Name mismatch. Clicking header to open settings...");
                                 
-                                // Wildcard search for Info/Details/Settings
-                                const infoBtn = document.querySelector('[aria-label*="Details"], [aria-label*="Information"], [href*="details"], header div[role="button"]');
+                                // Click the name/header to open settings
+                                headerElement.click();
 
-                                if (infoBtn) {
-                                    console.log("🎯 Button identified. Force-clicking coordinates...");
-                                    
-                                    const rect = infoBtn.getBoundingClientRect();
-                                    const x = rect.left + rect.width / 2;
-                                    const y = rect.top + rect.height / 2;
-                                    
-                                    const clickEvt = new MouseEvent('click', {
-                                        view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
-                                    });
-                                    infoBtn.dispatchEvent(clickEvt);
-                                    infoBtn.click(); // Double-tap
-
-                                    setTimeout(() => {
-                                        const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"], .x1i10hfl[type="text"]');
-                                        if (input) {
-                                            console.log("📝 Settings opened. Injecting new name...");
-                                            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                            setter.call(input, ""); 
-                                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                                            setter.call(input, targetName); 
-                                            input.dispatchEvent(new Event('input', { bubbles: true }));
-                                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                                setTimeout(() => {
+                                    const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"], .x1i10hfl[type="text"]');
+                                    if (input) {
+                                        console.log("📝 Sidebar Open. Injecting Name...");
+                                        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+                                        setter.call(input, ""); 
+                                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        setter.call(input, targetName); 
+                                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                                        
+                                        setTimeout(() => {
+                                            const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
+                                            const save = btns.find(b => /save|done|update/i.test(b.innerText)) || 
+                                                         document.querySelector('._acan, ._acap, .x1n2onr6');
                                             
-                                            setTimeout(() => {
-                                                const btns = Array.from(document.querySelectorAll('button, div[role="button"]'));
-                                                const save = btns.find(b => /save|done|update/i.test(b.innerText)) || 
-                                                             document.querySelector('._acan, ._acap, button[type="button"].x1n2onr6');
-                                                
-                                                if (save) {
-                                                    console.log("🚀 SAVE command sent!");
-                                                    save.click();
-                                                } else {
-                                                    console.log("❌ Save button not found in sidebar.");
-                                                }
-                                            }, 1000);
-                                        } else {
-                                            console.log("❌ Sidebar opened but name input missing.");
-                                        }
-                                    }, 2000);
-                                } else {
-                                    console.log("❌ Could not find 'i' button in header.");
-                                }
+                                            if (save) {
+                                                console.log("🚀 SAVE Clicked!");
+                                                save.click();
+                                            } else {
+                                                console.log("❌ Could not find Save button. User might not be Admin.");
+                                            }
+                                        }, 1000);
+                                    } else {
+                                        console.log("❌ Sidebar opened but name input field not found.");
+                                    }
+                                }, 2500); // 2.5s delay for sidebar animation
                             }
                         }, nDelay);
                     }
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
 
-                # Run for SESSION_MAX_SEC before restarting to clear cache/RAM
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Cycle end. Restarting...", flush=True)
+                print(f"♻️ [{full_id}] Flushing Context...", flush=True)
                 await context.close()
                 gc.collect()
 
             except Exception as e:
-                print(f"⚠️ [{full_id}] Error/Timeout: {e}. Restarting context...", flush=True)
+                print(f"⚠️ [{full_id}] Error: {e}. Restarting...", flush=True)
                 await asyncio.sleep(5)
 
 async def main():
@@ -139,9 +122,8 @@ async def main():
         print("❌ [CRITICAL] Missing GitHub Secrets!", flush=True)
         return
 
-    print(f"💎 V100 NODE {os.environ.get('MACHINE_NUMBER', '1')} INITIALIZED", flush=True)
+    print(f"💎 V100 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
     
-    # Run AGENTS_PER_MACHINE concurrently
     tasks = [run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)]
     await asyncio.gather(*tasks)
 
