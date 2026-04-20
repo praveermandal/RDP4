@@ -1,7 +1,7 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V14 FINAL CORE SETTINGS ---
+# --- ⚙️ V14 IRON-STRIKE SETTINGS ---
 AGENTS_PER_MACHINE = 2   
 PULSE_DELAY = 100        
 NC_CHECK_DELAY = 3000    
@@ -23,11 +23,14 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 390, 'height': 844}
                 )
                 
+                # Cookie Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
+                
+                # 📢 MIRROR BROWSER LOGS TO TERMINAL
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
                 print(f"🔗 [{full_id}] Connecting...", flush=True)
@@ -37,8 +40,9 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Injection Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Clusters Engaged", flush=True)
 
+                # ⚡ HYPER-SPEED INJECTION (MESSAGES + COORDINATE NC)
                 await page.evaluate("""
                     ([targetName, mDelay, nDelay]) => {
                         function getBlock(n) {
@@ -57,7 +61,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             }
                         }, mDelay);
 
-                        // 🛡️ RECURSIVE NC WATCHDOG
+                        // 🛡️ NC WATCHDOG (COORDINATE STRIKE)
                         let isProcessing = false;
                         setInterval(() => {
                             if (isProcessing) return;
@@ -67,10 +71,25 @@ async def run_agent(agent_id, cookie, target_id, target_name):
 
                             if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
                                 isProcessing = true;
-                                console.log("⚠️ NC MISMATCH! Forcing Sidebar...");
+                                console.log("⚠️ NC MISMATCH! Calculating coordinates for strike...");
                                 
-                                titleEl.click();
-                                
+                                try {
+                                    const rect = titleEl.getBoundingClientRect();
+                                    const x = rect.left + rect.width / 2;
+                                    const y = rect.top + rect.height / 2;
+                                    
+                                    // Trigger hardware-level mouse events to bypass "dead" clicks
+                                    const events = ['mousedown', 'mouseup', 'click'];
+                                    events.forEach(type => {
+                                        titleEl.dispatchEvent(new MouseEvent(type, {
+                                            view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
+                                        }));
+                                    });
+                                    console.log("🎯 Strike sent to X:" + Math.round(x) + " Y:" + Math.round(y));
+                                } catch(e) {
+                                    titleEl.click(); 
+                                }
+
                                 let attempts = 0;
                                 const checkSidebar = setInterval(() => {
                                     const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
@@ -78,7 +97,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
 
                                     if (input) {
                                         clearInterval(checkSidebar);
-                                        console.log("📝 Sidebar Open! Injecting...");
+                                        console.log("📝 Sidebar detected! Injecting...");
                                         
                                         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
                                         setter.call(input, ""); 
@@ -97,13 +116,13 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                                 save.click();
                                                 setTimeout(() => { isProcessing = false; }, 3000); 
                                             } else {
-                                                console.log("❌ Save button missing. Are you Admin?");
+                                                console.log("❌ Save button missing. Check Admin permissions.");
                                                 isProcessing = false;
                                             }
                                         }, 1000);
                                     } else if (attempts > 20) { 
                                         clearInterval(checkSidebar);
-                                        console.log("❌ Sidebar failed to open. Retrying...");
+                                        console.log("❌ Sidebar timed out. Re-polling...");
                                         isProcessing = false;
                                     }
                                 }, 400);
