@@ -1,17 +1,20 @@
-name: V100 Hyper-Cluster (8 Machines)
+name: V23 Mega-Cluster 24/7 (6-Hour Cycles)
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 */6 * * *' # Triggers every 6 hours
+  workflow_dispatch: 
 
 jobs:
-  spawn-cluster:
+  launch-overdrive:
     runs-on: ubuntu-latest
+    timeout-minutes: 360 # 6 Hours
     strategy:
       matrix:
         machine-id: [1, 2, 3, 4, 5, 6, 7, 8]
       fail-fast: false
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Python
@@ -19,20 +22,18 @@ jobs:
         with:
           python-version: '3.9'
 
-      - name: Install Playwright & Linux Dependencies
+      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install playwright
           python -m playwright install chromium
           python -m playwright install-deps chromium
 
-      - name: Execute V100 Agent
+      - name: Run Masterpiece
         env:
           INSTA_COOKIE: ${{ secrets.INSTA_COOKIE }}
           TARGET_THREAD_ID: ${{ secrets.TARGET_THREAD_ID }}
           TARGET_NAME: ${{ secrets.TARGET_NAME }}
           MACHINE_NUMBER: ${{ matrix.machine-id }}
         run: |
-          # Staggered start + Unbuffered python for real-time terminal logs
-          sleep $((MACHINE_NUMBER * 2))
+          sleep $(( (MACHINE_NUMBER - 1) * 5 ))
           python -u main.py
