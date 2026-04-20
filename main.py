@@ -1,7 +1,7 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V100 CLUSTER SETTINGS ---
+# --- ⚙️ V14 FINAL CORE SETTINGS ---
 AGENTS_PER_MACHINE = 2   
 PULSE_DELAY = 100        
 NC_CHECK_DELAY = 3000    
@@ -13,9 +13,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", 
-            "--disable-dev-shm-usage", 
-            "--disable-gpu"
+            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"
         ])
         
         while True:
@@ -25,31 +23,27 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 390, 'height': 844}
                 )
                 
-                # Cookie Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
-                
-                # 📢 MIRROR BROWSER LOGS TO TERMINAL
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
-                print(f"🔗 [{full_id}] Connecting to Thread...", flush=True)
+                print(f"🔗 [{full_id}] Connecting...", flush=True)
                 await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="domcontentloaded", timeout=60000)
                 
                 if "login" in page.url:
-                    print(f"❌ [{full_id}] SESSION EXPIRED! Reset your INSTA_COOKIE secret.", flush=True)
+                    print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Clusters Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Injection Engaged", flush=True)
 
-                # ⚡ HYPER-SPEED INJECTION (MESSAGES + AGGRESSIVE NC)
                 await page.evaluate("""
                     ([targetName, mDelay, nDelay]) => {
                         function getBlock(n) {
-                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿╿╿╿"; 
-                            return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
+                            const rail = "╿╿╿╿╿╿╿╿╿╿╿╿"; 
+                            return `🔱 (${n}) 🌸 P R V R 🔱\\n${rail}\\n${rail}\\n🔱 (${n}) 🌸 P R V R 🔱`;
                         }
 
                         // 📨 MESSAGE SPAMMER
@@ -63,60 +57,63 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                             }
                         }, mDelay);
 
-                        // 🛡️ NC WATCHDOG (FIXED & HARDENED)
+                        // 🛡️ RECURSIVE NC WATCHDOG
+                        let isProcessing = false;
                         setInterval(() => {
+                            if (isProcessing) return;
+
                             const titleEl = document.querySelector('header span[role="link"], .x1lliihq.x193iq5w, header h1, header span');
                             const currentName = titleEl ? titleEl.innerText : "";
 
                             if (currentName && !currentName.toLowerCase().includes(targetName.toLowerCase())) {
-                                console.log("⚠️ NC MISMATCH! Clicking header to force settings...");
+                                isProcessing = true;
+                                console.log("⚠️ NC MISMATCH! Forcing Sidebar...");
                                 
-                                // Triple-Click Strategy to wake up React
                                 titleEl.click();
-                                setTimeout(() => titleEl.click(), 200);
+                                
+                                let attempts = 0;
+                                const checkSidebar = setInterval(() => {
+                                    const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
+                                    attempts++;
 
-                                setTimeout(() => {
-                                    const input = document.querySelector('input[name="thread_name"], input[placeholder*="Name"], .x1i10hfl[type="text"]');
                                     if (input) {
-                                        console.log("📝 Settings Open. Forcing NC state...");
+                                        clearInterval(checkSidebar);
+                                        console.log("📝 Sidebar Open! Injecting...");
                                         
-                                        // Focus and Hardware-level Clear
-                                        input.focus();
                                         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                        
                                         setter.call(input, ""); 
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
-                                        
                                         setter.call(input, targetName); 
                                         input.dispatchEvent(new Event('input', { bubbles: true }));
                                         input.dispatchEvent(new Event('change', { bubbles: true }));
                                         
                                         setTimeout(() => {
-                                            // Search for ALL possible Save/Done buttons
                                             const btns = Array.from(document.querySelectorAll('button, div[role="button"], span[role="button"]'));
-                                            const save = btns.find(b => {
-                                                const txt = b.innerText.toLowerCase();
-                                                return txt.includes("save") || txt.includes("done") || txt.includes("update");
-                                            }) || document.querySelector('._acan, ._acap, .x1n2onr6');
+                                            const save = btns.find(b => /save|done|update/i.test(b.innerText)) || 
+                                                         document.querySelector('._acan, ._acap, .x1n2onr6');
                                             
                                             if (save) {
-                                                console.log("🚀 SAVE COMMAND SENT!");
+                                                console.log("🚀 SAVE EXECUTED!");
                                                 save.click();
-                                                // Close sidebar if it lingers
-                                                setTimeout(() => { if(document.body.contains(save)) save.click(); }, 300);
+                                                setTimeout(() => { isProcessing = false; }, 3000); 
                                             } else {
-                                                console.log("❌ NC Error: Save button hidden. Are you Admin?");
+                                                console.log("❌ Save button missing. Are you Admin?");
+                                                isProcessing = false;
                                             }
                                         }, 1000);
+                                    } else if (attempts > 20) { 
+                                        clearInterval(checkSidebar);
+                                        console.log("❌ Sidebar failed to open. Retrying...");
+                                        isProcessing = false;
                                     }
-                                }, 2500);
+                                }, 400);
                             }
                         }, nDelay);
                     }
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Restarting Context...", flush=True)
+                print(f"♻️ [{full_id}] Flushing RAM...", flush=True)
                 await context.close()
                 gc.collect()
 
