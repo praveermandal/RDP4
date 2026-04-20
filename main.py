@@ -6,13 +6,13 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
 # --- ⚙️ V100 TUNED SETTINGS ---
-THREADS = 2 
-TABS_PER_THREAD = 2 
-PULSE_DELAY = 100 
+THREADS = 2             # 2 Browsers per machine
+TABS_PER_THREAD = 2     # 2 Tabs per browser (4 Agents total)
+PULSE_DELAY = 100       # 100ms (Hyper-speed)
 
 # ♻️ RESTART CYCLES
-SESSION_MAX_SEC = 120 
-TOTAL_DURATION = 25000 
+SESSION_MAX_SEC = 120   # 2-Minute Restart to flush RAM
+TOTAL_DURATION = 25000  # ~7 Hours total run time
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -29,6 +29,7 @@ def get_driver():
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     
+    # Stealth to bypass detection on Linux/GitHub Runners
     stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
     return driver
 
@@ -42,11 +43,11 @@ def run_agent(agent_id, cookie, target_id, target_name):
             driver = get_driver()
             driver.get("https://www.instagram.com/")
             
-            # Cookie Injection
+            # Cookie Injection Logic
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # Launch Multi-Tabs
+            # Launch Multi-Tabs for maximum impact
             for _ in range(TABS_PER_THREAD):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
                 time.sleep(2)
@@ -54,7 +55,8 @@ def run_agent(agent_id, cookie, target_id, target_name):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
-                # ⚡ SHADOW REALM ENGINE (Option 12)
+                
+                # ⚡ THE "GLITCH PILLAR" ENGINE (V12 DESIGN)
                 driver.execute_script("""
                     const name = arguments[0];
                     const delay = arguments[1];
@@ -62,21 +64,32 @@ def run_agent(agent_id, cookie, target_id, target_name):
                     function getBlock(n) {
                         const flowers = ["🌸", "🌹", "🌷", "🌻", "🌺", "🌼", "💐"];
                         const flo = flowers[Math.floor(Math.random() * flowers.length)];
-                        const darkBar = "▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰\\n";
-                        const separator = "──────────────\\n";
                         
-                        // Header: Shadow Moons + Target + Flower
-                        let content = `🌑🌑 (${n}) ${flo} P R V R पापा से CUD 🌑🌑\\n`;
-                        content += darkBar;
+                        const glitchLine = "  ◢◤ ──────────────────── ◢◤\\n";
+                        const heavyBar = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓\\n";
                         
-                        // 15 Separator lines
+                        // Header
+                        let content = `🔱👑 (${n}) ${flo} P R V R पापा से CUD 👑🔱\\n`;
+                        content += heavyBar;
+                        content += glitchLine;
+                        
+                        // 15 Staggered Vertical Blocks (The "Waterfall" Effect)
                         for(let i=0; i<15; i++) { 
-                            content += separator; 
+                            let baseIndent = "     ";
+                            let stagger = "";
+                            let pattern = i % 4; 
+                            
+                            if (pattern === 1) stagger = "  ";
+                            else if (pattern === 2) stagger = "    ";
+                            else if (pattern === 3) stagger = "  ";
+                            
+                            content += `${baseIndent}${stagger}⚡\\n`; 
                         }
                         
-                        // Footer: Bar + Shadow Moons
-                        content += darkBar;
-                        content += `🌑🌑 (${n}) ${flo} P R V R पापा से CUD 🌑🌑`;
+                        // Footer
+                        content += glitchLine;
+                        content += heavyBar;
+                        content += `🔱👑 (${n}) ${flo} P R V R पापा से CUD 👑🔱`;
                         
                         return content;
                     }
@@ -86,36 +99,42 @@ def run_agent(agent_id, cookie, target_id, target_name):
                         if (box) {
                             const text = getBlock(name);
                             box.focus();
+                            
+                            // Core injection command
                             document.execCommand('insertText', false, text);
                             box.dispatchEvent(new Event('input', { bubbles: true }));
 
+                            // Fire Enter key
                             const enter = new KeyboardEvent('keydown', {
                                 bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
                             });
                             box.dispatchEvent(enter);
                             
-                            setTimeout(() => { if(box.innerHTML.length > 0) box.innerHTML = ""; }, 5);
+                            // Clear text residue to prevent overlap
+                            setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
                         }
                     }, delay);
                 """, target_name, PULSE_DELAY)
 
-            print(f"🔥 [Agent {agent_id}] Bursting Shadow Layout... (Reset in 120s)")
+            print(f"🔥 [Agent {agent_id}] Bursting Glitch Layout... (2-Min Burst)")
             time.sleep(SESSION_MAX_SEC) 
 
         except Exception as e:
             print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
         finally:
-            if driver: driver.quit()
-            gc.collect() 
+            if driver:
+                driver.quit()
+            gc.collect() # RAM Flush for V100 efficiency
             time.sleep(2)
 
 def main():
+    # Fetching secrets from GitHub Environment
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR") 
 
     if not cookie or not target_id:
-        print("❌ Missing Secrets!")
+        print("❌ Missing Secrets! Check GitHub Action Secrets.")
         return
 
     threads = []
@@ -123,7 +142,7 @@ def main():
         t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id, target_name))
         t.start()
         threads.append(t)
-        time.sleep(10)
+        time.sleep(10) # Staggered startup to avoid login blocks
 
     for t in threads:
         t.join()
