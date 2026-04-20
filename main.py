@@ -1,9 +1,9 @@
 import os, asyncio, re, sys, gc, random
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V23 SETTINGS ---
+# --- ⚙️ V24 SETTINGS ---
 AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 300        
+PULSE_DELAY = 100        # Reverted to 100ms for maximum impact
 SESSION_MAX_SEC = 21600  # 6 Hours per session
 
 async def run_agent(agent_id, cookie, target_id, target_name):
@@ -49,7 +49,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | 6-Hour Cycle Started", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Full-Throttle Aggression", flush=True)
 
                 await page.evaluate("""
                     ([targetName, mDelay]) => {
@@ -84,65 +84,6 @@ async def run_agent(agent_id, cookie, target_id, target_name):
             except Exception as e:
                 print(f"⚠️ [{full_id}] Error: {e}. Reconnecting...", flush=True)
                 await asyncio.sleep(10)
-
-async def main():
-    cookie = os.environ.get("INSTA_COOKIE")
-    target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "PRVR")
-    if not cookie or not target_id: return
-    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
-    await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
-
-if __name__ == "__main__":
-    asyncio.run(main())                print(f"🔗 [{full_id}] Connecting...", flush=True)
-                try:
-                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
-                except: pass
-
-                await asyncio.sleep(8)
-                if "login" in page.url:
-                    print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
-                    os._exit(1)
-
-                print(f"🔥 [{full_id}] ACTIVE | Overdrive Aggression", flush=True)
-
-                await page.evaluate("""
-                    ([targetName, mDelay]) => {
-                        const variations = [
-                            (n) => `💀 [${n}] P R V R DADDY IS HERE 💀\\n╿╿╿╿╿╿╿╿\\n💀 [${n}] P R V R DADDY IS HERE 💀`,
-                            (n) => `🔥 (${n}) बोल P R V R पापा ON TOP 🔥\\n💠💠💠💠💠💠\\n🔥 (${n}) बोल P R V R पापा ON TOP 🔥`,
-                            (n) => `🥶 [${n}] TERA SYSTEM HANG 🥶\\n🧊🧊🧊🧊🧊🧊\\n🥶 [${n}] TERA SYSTEM HANG 🥶`,
-                            (n) => `🔱 (${n}) SAY 🌸 P R V R पापा🔱\\n🎀🎀🎀🎀🎀🎀\\n🔱 (${n}) SAY 🌸 P R V R पापा🔱`,
-                            (n) => `💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n⚡⚡⚡⚡⚡⚡\\n💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
-                            (n) => `😈 [${n}] P R V R BAP HAI TERA 😈\\n🚩🚩🚩🚩🚩🚩\\n😈 [${n}] P R V R BAP HAI TERA 😈`,
-                            (n) => `🔪 [${n}] CHUP REH RΔNDI KE 🔪\\n🩸🩸🩸🩸🩸🩸\\n🔪 [${n}] CHUP REH RΔNDI KE 🔪`,
-                            (n) => `💎 (${n}) PRVR OWNS YOU BITCH 💎\\n✨✨✨✨✨✨\\n💎 (${n}) PRVR OWNS YOU BITCH 💎`,
-                            (n) => `💀 [${n}] KʜᴀNDᴀN CʜᴏD DᴜɴGᴀ TᴇRᴀ 💀\\n💀💀💀💀💀💀\\n💀 [${n}] KʜᴀNDᴀN CʜᴏD DᴜɴGᴀ TᴇRᴀ 💀`,
-                            (n) => `🔥 (${n}) P R V R PΔPΔ IS BACK 🔥\\n🔱🔱🔱🔱🔱🔱\\n🔥 (${n}) P R V R PΔPΔ IS BACK 🔥`,
-                            (n) => `🌊 [${n}] IɴTᴇRɴᴇT Kᴀ BᴀAᴘ P R V R 🌊\\n🌊🌊🌊🌊🌊🌊\\n🌊 [${n}] IɴTᴇRɴᴇT Kᴀ BᴀAᴘ P R V R 🌊`,
-                            (n) => `👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺\\n👹👹👹👹👹👹\\n👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺`
-                        ];
-
-                        setInterval(() => {
-                            const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
-                            if (box) {
-                                box.focus();
-                                const randomMsg = variations[Math.floor(Math.random() * variations.length)](targetName);
-                                document.execCommand('insertText', false, randomMsg);
-                                box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
-                            }
-                        }, mDelay);
-                    }
-                """, [target_name, PULSE_DELAY])
-
-                await asyncio.sleep(SESSION_MAX_SEC)
-                await context.close()
-                gc.collect()
-
-            except Exception as e:
-                print(f"⚠️ [{full_id}] Error: {e}")
-                await asyncio.sleep(5)
 
 async def main():
     cookie = os.environ.get("INSTA_COOKIE")
