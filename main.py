@@ -1,10 +1,10 @@
 import os, asyncio, re, sys, gc, random
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V24 SETTINGS ---
+# --- ⚙️ V25 CHAOS SETTINGS ---
 AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 100        # Reverted to 100ms for maximum impact
-SESSION_MAX_SEC = 21600  # 6 Hours per session
+PULSE_DELAY = 100        # Reverted to 100ms for full-throttle chaos
+SESSION_MAX_SEC = 21600  # 6 Hours per cycle
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
@@ -12,10 +12,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", 
-            "--disable-dev-shm-usage", 
-            "--disable-gpu",
-            "--disable-setuid-sandbox"
+            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"
         ])
         
         while True:
@@ -33,8 +30,71 @@ async def run_agent(agent_id, cookie, target_id, target_name):
 
                 def log_filter(msg):
                     txt = msg.text.lower()
-                    ignore_list = ["content security policy", "permissions-policy", "selfxss", "bluetooth", "unload", "webassembly", "stop!", "browser feature", "scam"]
-                    if not any(x in txt for x in ignore_list):
+                    ignore = ["content security policy", "permissions-policy", "selfxss", "bluetooth", "unload", "webassembly", "stop!", "browser feature", "scam"]
+                    if not any(x in txt for x in ignore):
+                        print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True)
+
+                page.on("console", log_filter)
+
+                print(f"🔗 [{full_id}] Connecting...", flush=True)
+                try:
+                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
+                except: pass
+
+                await asyncio.sleep(8)
+                if "login" in page.url:
+                    print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
+                    os._exit(1)
+
+                print(f"🔥 [{full_id}] ACTIVE | Chaos-Overdrive Engaged", flush=True)
+
+                await page.evaluate("""
+                    ([targetName, mDelay]) => {
+                        const lightning = "      ⚡\\n        ⚡\\n          ⚡\\n        ⚡\\n      ⚡\\n".repeat(3);
+                        const border = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓";
+                        const line = "◢◤ ─────────────────── ◢◤";
+                        
+                        const variations = [
+                            (n) => `🔱👑 (${n}) 🌸 P R V R पापा से CUD 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${n}) 🌸 P R V R पापा से CUD 👑🔱`,
+                            (n) => `💀 [${n}] P R V R DADDY IS HERE 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${n}] P R V R DADDY IS HERE 💀`,
+                            (n) => `🔥 (${n}) बोल P R V R पापा ON TOP 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${n}) बोल P R V R पापा ON TOP 🔥`,
+                            (n) => `🥶 [${n}] TERA SYSTEM HANG 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${n}] TERA SYSTEM HANG 🥶`,
+                            (n) => `💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${n}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
+                            (n) => `🔪 [${n}] CHUP REH RΔNDI KE 🔪\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔪 [${n}] CHUP REH RΔNDI KE 🔪`,
+                            (n) => `👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n👺 [${n}] RΔNDI KΔ LΔDKΔ ${n} 👺`
+                        ];
+
+                        setInterval(() => {
+                            const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
+                            if (box) {
+                                box.focus();
+                                const randomMsg = variations[Math.floor(Math.random() * variations.length)](targetName);
+                                document.execCommand('insertText', false, randomMsg);
+                                box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
+                                setTimeout(() => { if(box.innerText.length > 0) box.innerHTML = ""; }, 5);
+                            }
+                        }, mDelay);
+                    }
+                """, [target_name, PULSE_DELAY])
+
+                await asyncio.sleep(SESSION_MAX_SEC)
+                await context.close()
+                gc.collect()
+
+            except Exception as e:
+                print(f"⚠️ [{full_id}] Error: {e}")
+                await asyncio.sleep(10)
+
+async def main():
+    cookie = os.environ.get("INSTA_COOKIE")
+    target_id = os.environ.get("TARGET_THREAD_ID")
+    target_name = os.environ.get("TARGET_NAME", "PRVR")
+    if not cookie or not target_id: return
+    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
+    await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
+
+if __name__ == "__main__":
+    asyncio.run(main())                    if not any(x in txt for x in ignore_list):
                         print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True)
 
                 page.on("console", log_filter)
