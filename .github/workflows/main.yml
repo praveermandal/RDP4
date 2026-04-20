@@ -33,6 +33,6 @@ jobs:
           TARGET_NAME: ${{ secrets.TARGET_NAME }}
           MACHINE_NUMBER: ${{ matrix.machine-id }}
         run: |
-          # Staggered start to prevent simultaneous login flags
+          # Staggered start + Unbuffered python for real-time terminal logs
           sleep $((MACHINE_NUMBER * 2))
-          python main.py
+          python -u main.py
