@@ -1,10 +1,10 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V15 CORE SETTINGS ---
+# --- ⚙️ V16 CORE SETTINGS ---
 AGENTS_PER_MACHINE = 2   
 PULSE_DELAY = 100        
-NC_CHECK_DELAY = 4000    # Slightly slower to allow page loads
+NC_CHECK_DELAY = 4000    
 SESSION_MAX_SEC = 250    
 
 async def run_agent(agent_id, cookie, target_id, target_name):
@@ -23,7 +23,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                     viewport={'width': 390, 'height': 844}
                 )
                 
-                # Cookie Injection
+                # Cookie Extraction & Injection
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
                 sid = sid_match.group(1) if sid_match else cookie
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
@@ -31,14 +31,22 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 page = await context.new_page()
                 page.on("console", lambda msg: print(f"🌐 [{full_id}] Browser: {msg.text}", flush=True))
 
-                print(f"🔗 [{full_id}] Connecting...", flush=True)
-                await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="domcontentloaded", timeout=60000)
+                print(f"🔗 [{full_id}] Connecting via Fast-Commit...", flush=True)
                 
+                # CRITICAL: wait_until="commit" stops the 'stuck' behavior
+                try:
+                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=45000)
+                except Exception:
+                    print(f"⚠️ [{full_id}] Connection slow, forcing injection anyway...", flush=True)
+
+                # Brief pause to allow the bare minimum DOM to appear
+                await asyncio.sleep(7)
+
                 if "login" in page.url:
                     print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
                     os._exit(1)
 
-                print(f"🔥 [{full_id}] ACTIVE | Direct-Path Engaged", flush=True)
+                print(f"🔥 [{full_id}] ACTIVE | Injection Engaged", flush=True)
 
                 # ⚡ HYPER-SPEED INJECTION (MESSAGES + URL-JUMP NC)
                 await page.evaluate("""
@@ -74,7 +82,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                 window.location.href = `https://www.instagram.com/direct/t/${threadId}/details/`;
                             }
 
-                            // 2. We are on details page, FIX it
+                            // 2. Details page logic
                             if (window.location.href.includes('/details/')) {
                                 const input = document.querySelector('input[name="thread_name"], .x1i10hfl[type="text"]');
                                 if (input && input.value !== targetName) {
@@ -94,11 +102,11 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                                             setTimeout(() => { 
                                                 window.location.href = `https://www.instagram.com/direct/t/${threadId}/`; 
                                                 isProcessing = false;
-                                            }, 1500);
+                                            }, 2000);
                                         }
                                     }, 1000);
                                 } else if (!input && document.readyState === 'complete') {
-                                    console.log("⚠️ Input missing (Check Admin). Returning to chat...");
+                                    console.log("⚠️ Input missing. Returning to chat...");
                                     window.location.href = `https://www.instagram.com/direct/t/${threadId}/`;
                                     isProcessing = false;
                                 }
@@ -108,7 +116,7 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 """, [target_name, PULSE_DELAY, NC_CHECK_DELAY, target_id])
 
                 await asyncio.sleep(SESSION_MAX_SEC)
-                print(f"♻️ [{full_id}] Flushing RAM...", flush=True)
+                print(f"♻️ [{full_id}] Flushing Context...", flush=True)
                 await context.close()
                 gc.collect()
 
