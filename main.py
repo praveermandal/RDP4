@@ -1,9 +1,9 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V29 SUPER-THREADED SETTINGS ---
-AGENTS_PER_MACHINE = 3    # Total 24 agents across 8 machines
-PULSE_DELAY = 100         # Maximum Frequency
+# --- ⚙️ V30 BALANCED SETTINGS ---
+AGENTS_PER_MACHINE = 2    # Back to 2 to prevent "Lost Communication" errors
+PULSE_DELAY = 100         
 SESSION_MAX_SEC = 21600   # 6 Hours
 
 async def run_agent(agent_id, cookie, target_id, target_name):
@@ -11,13 +11,14 @@ async def run_agent(agent_id, cookie, target_id, target_name):
     full_id = f"M{m_num}-A{agent_id}"
     
     async with async_playwright() as p:
-        # Optimization: Stripping Chromium to the bone
+        # Optimized flags for GitHub Runner stability
         browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage",
-            "--js-flags='--max-old-space-size=512'", # Reduced to fit 3 agents/machine
+            "--no-sandbox", 
+            "--disable-gpu", 
+            "--disable-dev-shm-usage",
+            "--js-flags='--max-old-space-size=1024'", # Give each browser 1GB
             "--blink-settings=imagesEnabled=false",
-            "--disable-extensions",
-            "--disable-component-update"
+            "--disable-web-security" # Speeds up DOM access
         ])
         
         while True:
@@ -33,16 +34,15 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 page = await context.new_page()
                 page.on("console", lambda msg: None) 
 
-                print(f"🔗 [{full_id}] BOOTING...", flush=True)
+                print(f"🔗 [{full_id}] IGNITION...", flush=True)
                 try:
                     await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit")
                 except: pass
 
-                await asyncio.sleep(5)
+                await asyncio.sleep(6)
+                print(f"🔥 [{full_id}] BALANCED-OVERDRIVE ACTIVE", flush=True)
 
-                print(f"🔥 [{full_id}] SUPER-THREADED ACTIVE", flush=True)
-
-                # ⚡ BUFFER-FIREHOSE INJECTION
+                # ⚡ ULTIMATE BOLD-RANDOMIZER LOOP
                 await page.evaluate("""
                     ([tName, mDelay]) => {
                         const toBold = (t) => {
@@ -70,9 +70,10 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                         setInterval(() => {
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
+                                // Direct injection without re-focusing saves ms
                                 document.execCommand('insertText', false, v[Math.floor(Math.random() * v.length)]);
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                box.innerHTML = "";
+                                box.innerHTML = ""; 
                             }
                         }, mDelay);
                     }
@@ -90,7 +91,7 @@ async def main():
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR")
     if not cookie or not target_id: return
-    print(f"🚀 V29 CLUSTER ONLINE | 24 AGENTS | BOLD MODE", flush=True)
+    print(f"🚀 V30 CLUSTER STABILIZED | 16 AGENTS ACTIVE", flush=True)
     await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
 
 if __name__ == "__main__":
