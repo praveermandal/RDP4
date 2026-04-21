@@ -1,30 +1,27 @@
 import os, asyncio, re, sys, gc
 from playwright.async_api import async_playwright
 
-# --- ⚙️ V30 BALANCED SETTINGS ---
-AGENTS_PER_MACHINE = 2    # Back to 2 to prevent "Lost Communication" errors
-PULSE_DELAY = 100         
-SESSION_MAX_SEC = 21600   # 6 Hours
+# --- ⚙️ V26 HIGH-SPEED SETTINGS ---
+AGENTS_PER_MACHINE = 2   
+PULSE_DELAY = 100        # Selenium-matching speed
+SESSION_MAX_SEC = 21600  # 6 Hours
 
 async def run_agent(agent_id, cookie, target_id, target_name):
     m_num = os.environ.get("MACHINE_NUMBER", "1")
     full_id = f"M{m_num}-A{agent_id}"
     
     async with async_playwright() as p:
-        # Optimized flags for GitHub Runner stability
+        # Optimization: Use fixed flags to reduce browser overhead
         browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", 
-            "--disable-gpu", 
-            "--disable-dev-shm-usage",
-            "--js-flags='--max-old-space-size=1024'", # Give each browser 1GB
-            "--blink-settings=imagesEnabled=false",
-            "--disable-web-security" # Speeds up DOM access
+            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", 
+            "--js-flags='--max-old-space-size=512'"
         ])
         
         while True:
             try:
                 context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15"
+                    user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
+                    viewport={'width': 390, 'height': 844}
                 )
                 
                 sid_match = re.search(r'sessionid=([^;]+)', cookie)
@@ -32,48 +29,49 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
                 
                 page = await context.new_page()
+
+                # Silence logs to save CPU cycles
                 page.on("console", lambda msg: None) 
 
-                print(f"🔗 [{full_id}] IGNITION...", flush=True)
+                print(f"🔗 [{full_id}] Connecting...", flush=True)
                 try:
-                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit")
+                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=30000)
                 except: pass
 
-                await asyncio.sleep(6)
-                print(f"🔥 [{full_id}] BALANCED-OVERDRIVE ACTIVE", flush=True)
+                await asyncio.sleep(7)
+                if "login" in page.url:
+                    print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
+                    os._exit(1)
 
-                # ⚡ ULTIMATE BOLD-RANDOMIZER LOOP
+                print(f"🔥 [{full_id}] ACTIVE | Internal-Burner Engaged", flush=True)
+
+                # ⚡ PURE JAVASCRIPT LOOP (No Python Overhead)
                 await page.evaluate("""
                     ([tName, mDelay]) => {
-                        const toBold = (t) => {
-                            const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-                            const b = '𝐀𝐁𝐂𝐃𝐄𝐅𝐆𝐇𝐈𝐉𝐊𝐋𝐌𝐍𝐎𝐏𝐐𝐑𝐒𝐓𝐔𝐕𝐖𝐗𝐘𝐙𝐚𝐛𝐜𝐝𝐞𝐟𝐠𝐡𝐢𝐣𝐤𝐥𝐦𝐧𝐨𝐩𝐪𝐫𝐬𝐭𝐮𝐯𝐰𝐱𝐲𝐳𝟎𝟏𝟐𝟑𝟒𝟓𝟔𝟕𝟖𝟗';
-                            return t.split('').map(x => {
-                                const i = c.indexOf(x);
-                                return i > -1 ? b.slice(i * 2, i * 2 + 2) : x;
-                            }).join('');
-                        };
-
-                        const bN = toBold(tName);
                         const lightning = "      ⚡\\n        ⚡\\n          ⚡\\n        ⚡\\n      ⚡\\n".repeat(3);
                         const border = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓";
                         const line = "◢◤ ─────────────────── ◢◤";
                         
-                        const v = [
-                            `🔱👑 (${bN}) 🌸 𝐏 𝐑 𝐕 𝐑 पापा से 𝐂𝐔𝐃 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${bN}) 🌸 𝐏 𝐑 𝐕 𝐑 पापा से 𝐂𝐔𝐃 👑🔱`,
-                            `💀 [${bN}] 𝐏 𝐑 𝐕 𝐑 𝐃𝐀𝐃𝐃𝐘 𝐈𝐒 𝐇𝐄𝐑𝐄 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${bN}] 𝐏 𝐑 𝐕 𝐑 𝐃𝐀𝐃𝐃𝐘 𝐈𝐒 𝐇𝐄𝐑𝐄 💀`,
-                            `🔥 (${bN}) बोल 𝐏 𝐑 𝐕 𝐑 पापा 𝐎𝐍 𝐓𝐎𝐏 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${bN}) बोल 𝐏 𝐑 𝐕 𝐑 पापा 𝐎𝐍 𝐓𝐎𝐏 🔥`,
-                            `🥶 [${bN}] 𝐓𝐄𝐑𝐀 𝐒𝐘𝐒𝐓𝐄𝐌 𝐇𝐀𝐍𝐆 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${bN}] 𝐓𝐄𝐑𝐀 𝐒𝐘𝐒𝐓𝐄𝐌 𝐇𝐀𝐍𝐆 🥶`,
-                            `💢 [${bN}] 𝐓𝐄𝐑𝐈 𝐌𝐀 𝐂𝐇𝐎𝐃𝐔 𝐌𝐀𝐃𝐀𝐑𝐂𝐇𝐎𝐃 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${bN}] 𝐓𝐄𝐑𝐈 𝐌𝐀 𝐂𝐇𝐎𝐃𝐔 𝐌𝐀𝐃𝐀𝐑𝐂𝐇𝐎𝐃 💢`
+                        const vars = [
+                            `🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱`,
+                            `💀 [${tName}] P R V R DADDY IS HERE 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${tName}] P R V R DADDY IS HERE 💀`,
+                            `🔥 (${tName}) बोल P R V R पापा ON TOP 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${tName}) बोल P R V R पापा ON TOP 🔥`,
+                            `🥶 [${tName}] TERA SYSTEM HANG 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${tName}] TERA SYSTEM HANG 🥶`,
+                            `💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
+                            `🔪 [${tName}] CHUP REH RΔNDI KE 🔪\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔪 [${tName}] CHUP REH RΔNDI KE 🔪`
                         ];
 
                         setInterval(() => {
                             const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                             if (box) {
-                                // Direct injection without re-focusing saves ms
-                                document.execCommand('insertText', false, v[Math.floor(Math.random() * v.length)]);
+                                box.focus();
+                                const msg = vars[Math.floor(Math.random() * vars.length)];
+                                // Use Direct DOM Injection - much faster than typing
+                                document.execCommand('insertText', false, msg);
                                 box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                box.innerHTML = ""; 
+                                
+                                // Micro-cleanup to prevent UI lag
+                                if(box.innerText.length > 50) box.innerHTML = "";
                             }
                         }, mDelay);
                     }
@@ -83,15 +81,16 @@ async def run_agent(agent_id, cookie, target_id, target_name):
                 await context.close()
                 gc.collect()
 
-            except Exception:
-                await asyncio.sleep(5)
+            except Exception as e:
+                print(f"⚠️ [{full_id}] Error: {e}")
+                await asyncio.sleep(10)
 
 async def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
     target_name = os.environ.get("TARGET_NAME", "PRVR")
     if not cookie or not target_id: return
-    print(f"🚀 V30 CLUSTER STABILIZED | 16 AGENTS ACTIVE", flush=True)
+    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
     await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
 
 if __name__ == "__main__":
