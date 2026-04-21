@@ -1,97 +1,128 @@
-import os, asyncio, re, sys, gc
-from playwright.async_api import async_playwright
+import os, time, re, random, threading, gc, sys
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium_stealth import stealth
 
-# --- ⚙️ V26 HIGH-SPEED SETTINGS ---
-AGENTS_PER_MACHINE = 2   
-PULSE_DELAY = 100        # Selenium-matching speed
-SESSION_MAX_SEC = 21600  # 6 Hours
+# --- ⚙️ V100 TUNED SETTINGS ---
+THREADS = 2 
+TABS_PER_THREAD = 2 
+PULSE_DELAY = 100 
 
-async def run_agent(agent_id, cookie, target_id, target_name):
-    m_num = os.environ.get("MACHINE_NUMBER", "1")
-    full_id = f"M{m_num}-A{agent_id}"
+# ♻️ RESTART CYCLES
+SESSION_MAX_SEC = 120 
+TOTAL_DURATION = 25000 
+
+sys.stdout.reconfigure(encoding='utf-8')
+
+def get_driver():
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--blink-settings=imagesEnabled=false")
+    options.page_load_strategy = 'eager'
+    options.add_experimental_option("mobileEmulation", {"deviceName": "iPad Pro"})
     
-    async with async_playwright() as p:
-        # Optimization: Use fixed flags to reduce browser overhead
-        browser = await p.chromium.launch(headless=True, args=[
-            "--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", 
-            "--js-flags='--max-old-space-size=512'"
-        ])
-        
-        while True:
-            try:
-                context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15",
-                    viewport={'width': 390, 'height': 844}
-                )
-                
-                sid_match = re.search(r'sessionid=([^;]+)', cookie)
-                sid = sid_match.group(1) if sid_match else cookie
-                await context.add_cookies([{'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com', 'path': '/'}])
-                
-                page = await context.new_page()
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
+    
+    stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
+    return driver
 
-                # Silence logs to save CPU cycles
-                page.on("console", lambda msg: None) 
+def run_agent(agent_id, cookie, target_id, target_name):
+    global_start = time.time()
+    
+    while (time.time() - global_start) < TOTAL_DURATION:
+        driver = None
+        try:
+            print(f"🚀 [Agent {agent_id}] Starting 2-Min Cycle...")
+            driver = get_driver()
+            driver.get("https://www.instagram.com/")
+            
+            # Cookie Injection
+            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
+            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+            
+            # Launch Multi-Tabs
+            for _ in range(TABS_PER_THREAD):
+                driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
+                time.sleep(2)
 
-                print(f"🔗 [{full_id}] Connecting...", flush=True)
-                try:
-                    await page.goto(f"https://www.instagram.com/direct/t/{target_id}/", wait_until="commit", timeout=30000)
-                except: pass
-
-                await asyncio.sleep(7)
-                if "login" in page.url:
-                    print(f"❌ [{full_id}] SESSION EXPIRED!", flush=True)
-                    os._exit(1)
-
-                print(f"🔥 [{full_id}] ACTIVE | Internal-Burner Engaged", flush=True)
-
-                # ⚡ PURE JAVASCRIPT LOOP (No Python Overhead)
-                await page.evaluate("""
-                    ([tName, mDelay]) => {
-                        const lightning = "      ⚡\\n        ⚡\\n          ⚡\\n        ⚡\\n      ⚡\\n".repeat(3);
-                        const border = "▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓";
-                        const line = "◢◤ ─────────────────── ◢◤";
+            handles = driver.window_handles[1:]
+            for handle in handles:
+                driver.switch_to.window(handle)
+                # ⚡ CYBER GLITCH ENGINE (Option 7)
+                driver.execute_script("""
+                    const name = arguments[0];
+                    const delay = arguments[1];
+                    
+                    function getBlock(n) {
+                        const flowers = ["🌸", "🌹", "🌷", "🌻", "🌺", "🌼", "💐"];
+                        const flo = flowers[Math.floor(Math.random() * flowers.length)];
+                        const glitchLine = "// ────────────── //\\n";
                         
-                        const vars = [
-                            `🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔱👑 (${tName}) 🌸 P R V R पापा से CUD 👑🔱`,
-                            `💀 [${tName}] P R V R DADDY IS HERE 💀\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💀 [${tName}] P R V R DADDY IS HERE 💀`,
-                            `🔥 (${tName}) बोल P R V R पापा ON TOP 🔥\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔥 (${tName}) बोल P R V R पापा ON TOP 🔥`,
-                            `🥶 [${tName}] TERA SYSTEM HANG 🥶\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🥶 [${tName}] TERA SYSTEM HANG 🥶`,
-                            `💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n💢 [${tName}] Tᴇʀɪ Mᴀ Cʜᴏᴅᴜ Mᴀᴅᴀʀᴄʜxᴅ 💢`,
-                            `🔪 [${tName}] CHUP REH RΔNDI KE 🔪\\n${border}\\n${line}\\n${lightning}${line}\\n${border}\\n🔪 [${tName}] CHUP REH RΔNDI KE 🔪`
-                        ];
-
-                        setInterval(() => {
-                            const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
-                            if (box) {
-                                box.focus();
-                                const msg = vars[Math.floor(Math.random() * vars.length)];
-                                // Use Direct DOM Injection - much faster than typing
-                                document.execCommand('insertText', false, msg);
-                                box.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', keyCode: 13 }));
-                                
-                                // Micro-cleanup to prevent UI lag
-                                if(box.innerText.length > 50) box.innerHTML = "";
-                            }
-                        }, mDelay);
+                        // Header: Cyber Brackets + Rotating Flower
+                        let content = `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]\\n`;
+                        
+                        // 15 Separator lines in Cyber style
+                        for(let i=0; i<15; i++) { 
+                            content += glitchLine; 
+                        }
+                        
+                        // Footer: Same Brackets
+                        content += `[ ⚡ (${n}) ${flo} P R V R पापा से CUD ⚡ ]`;
+                        
+                        return content;
                     }
-                """, [target_name, PULSE_DELAY])
 
-                await asyncio.sleep(SESSION_MAX_SEC)
-                await context.close()
-                gc.collect()
+                    setInterval(() => {
+                        const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
+                        if (box) {
+                            const text = getBlock(name);
+                            box.focus();
+                            document.execCommand('insertText', false, text);
+                            box.dispatchEvent(new Event('input', { bubbles: true }));
 
-            except Exception as e:
-                print(f"⚠️ [{full_id}] Error: {e}")
-                await asyncio.sleep(10)
+                            const enter = new KeyboardEvent('keydown', {
+                                bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
+                            });
+                            box.dispatchEvent(enter);
+                            
+                            setTimeout(() => { if(box.innerHTML.length > 0) box.innerHTML = ""; }, 5);
+                        }
+                    }, delay);
+                """, target_name, PULSE_DELAY)
 
-async def main():
+            print(f"🔥 [Agent {agent_id}] Bursting Cyber Layout... (Reset in 120s)")
+            time.sleep(SESSION_MAX_SEC) 
+
+        except Exception as e:
+            print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
+        finally:
+            if driver: driver.quit()
+            gc.collect() 
+            time.sleep(2)
+
+def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "PRVR")
-    if not cookie or not target_id: return
-    print(f"💎 NODE {os.environ.get('MACHINE_NUMBER', '1')} ONLINE", flush=True)
-    await asyncio.gather(*[run_agent(i + 1, cookie, target_id, target_name) for i in range(AGENTS_PER_MACHINE)])
+    target_name = os.environ.get("TARGET_NAME", "PRVR") 
+
+    if not cookie or not target_id:
+        print("❌ Missing Secrets!")
+        return
+
+    threads = []
+    for i in range(THREADS):
+        t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id, target_name))
+        t.start()
+        threads.append(t)
+        time.sleep(10)
+
+    for t in threads:
+        t.join()
 
 if __name__ == "__main__":
-    asyncio.run(main())
