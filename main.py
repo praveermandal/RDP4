@@ -7,10 +7,10 @@ from selenium_stealth import stealth
 
 # --- ⚙️ V100 TUNED SETTINGS ---
 THREADS = 2             # 2 Browsers per machine
-TABS_PER_THREAD = 2     # 2 Tabs per browser (4 Agents total per machine)
+TABS_PER_THREAD = 2     # 3 Tabs per browser (6 Agents total)
 PULSE_DELAY = 100       # 100ms (Hyper-speed)
 
-# ♻️ RESTART CYCLES
+# ♻️ RESTART CYCLES (As requested)
 SESSION_MAX_SEC = 120   # 2-Minute Restart
 TOTAL_DURATION = 25000  # ~7 Hours
 
@@ -42,9 +42,11 @@ def run_agent(agent_id, cookie, target_id, target_name):
             driver = get_driver()
             driver.get("https://www.instagram.com/")
             
+            # Cookie Injection
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
+            # Launch Multi-Tabs
             for _ in range(TABS_PER_THREAD):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
                 time.sleep(2)
@@ -52,6 +54,7 @@ def run_agent(agent_id, cookie, target_id, target_name):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
+                # ⚡ THE JS HYPER-ENGINE (Firing 100ms)
                 driver.execute_script("""
                     const name = arguments[0];
                     const delay = arguments[1];
@@ -84,13 +87,13 @@ def run_agent(agent_id, cookie, target_id, target_name):
                 """, target_name, PULSE_DELAY)
 
             print(f"🔥 [Agent {agent_id}] Bursting... (Reset in 120s)")
-            time.sleep(SESSION_MAX_SEC)
+            time.sleep(SESSION_MAX_SEC) # 2-Minute Life Cycle
 
         except Exception as e:
             print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
         finally:
             if driver: driver.quit()
-            gc.collect()
+            gc.collect() # RAM Flush
             time.sleep(2)
 
 def main():
