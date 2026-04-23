@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os, time, re, random, threading, gc, sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -5,14 +6,12 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
-# --- ⚙️ V100 TUNED SETTINGS ---
-THREADS = 2             # 2 Browsers per machine
-TABS_PER_THREAD = 2     # 3 Tabs per browser (6 Agents total)
-PULSE_DELAY = 100       # 100ms (Hyper-speed)
-
-# ♻️ RESTART CYCLES (As requested)
-SESSION_MAX_SEC = 120   # 2-Minute Restart
-TOTAL_DURATION = 25000  # ~7 Hours
+# --- ⚙️ V100 TUNED SETTINGS (STABLE) ---
+THREADS = 2             
+TABS_PER_THREAD = 2     
+PULSE_DELAY = 100       
+SESSION_MAX_SEC = 120   
+TOTAL_DURATION = 25000  
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -42,11 +41,9 @@ def run_agent(agent_id, cookie, target_id, target_name):
             driver = get_driver()
             driver.get("https://www.instagram.com/")
             
-            # Cookie Injection
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # Launch Multi-Tabs
             for _ in range(TABS_PER_THREAD):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
                 time.sleep(2)
@@ -54,17 +51,20 @@ def run_agent(agent_id, cookie, target_id, target_name):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
-                # ⚡ THE JS HYPER-ENGINE (Firing 100ms)
+                # ⚡ HYPER-ENGINE WITH UPDATED BRANDING
                 driver.execute_script("""
                     const name = arguments[0];
                     const delay = arguments[1];
                     
                     function getBlock(n) {
-                        const emojis = ["👑", "⚡", "🔥", "🦈", "🦁", "💎", "⚔️", "🔱", "🧿", "🌪️"];
+                        const emojis = ["⭕", "🌀", "🔴", "💠", "🧿", "🔘"];
                         const emo = emojis[Math.floor(Math.random() * emojis.length)];
-                        const line = `【 ${n} 】 SAY P R V R बाप ${emo} ____________________/\\n`;
+                        
+                        // UPDATED BRANDING: CLEAN PILLAR ALIGNMENT
+                        const line = `(${n}) 𝚂ᴀ𝚈 【﻿ＰＲＶ𝐑】 𝐃ᴀ𝐃𝐃𝐘 ~${emo}\\n`;
+                        
                         let block = "";
-                        for(let i=0; i<20; i++) { block += line; }
+                        for(let i=0; i<22; i++) { block += line; }
                         return block + "\\n⚡ ID: " + Math.random().toString(36).substring(7);
                     }
 
@@ -86,20 +86,20 @@ def run_agent(agent_id, cookie, target_id, target_name):
                     }, delay);
                 """, target_name, PULSE_DELAY)
 
-            print(f"🔥 [Agent {agent_id}] Bursting... (Reset in 120s)")
-            time.sleep(SESSION_MAX_SEC) # 2-Minute Life Cycle
+            print(f"🔥 [Agent {agent_id}] Bursting PRVR DADDY... (Reset in 120s)")
+            time.sleep(SESSION_MAX_SEC) 
 
         except Exception as e:
             print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
         finally:
             if driver: driver.quit()
-            gc.collect() # RAM Flush
+            gc.collect() 
             time.sleep(2)
 
 def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
-    target_name = os.environ.get("TARGET_NAME", "EZRA")
+    target_name = os.environ.get("TARGET_NAME", "TARGET")
 
     if not cookie or not target_id:
         print("❌ Missing Secrets!")
