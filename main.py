@@ -6,11 +6,11 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
-# --- ⚡ V100 HYPER-ENGINE SETTINGS (PULSE TUNED) ---
+# --- ⚙️ V100 TUNED SETTINGS (STABLE) ---
 THREADS = 2             
 TABS_PER_THREAD = 2     
-PULSE_DELAY = 85        # Precision tuned for 80-100ms actual speed
-SESSION_MAX_SEC = 60    # Fast resets prevent memory leaks and lag
+PULSE_DELAY = 100       
+SESSION_MAX_SEC = 120   
 TOTAL_DURATION = 25000  
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -21,32 +21,29 @@ def get_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
+    options.add_argument("--blink-settings=imagesEnabled=false")
     options.page_load_strategy = 'eager'
-    # High-performance mobile emulation for iPad Pro
     options.add_experimental_option("mobileEmulation", {"deviceName": "iPad Pro"})
     
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=options)
     
-    # Stealth parameters to bypass basic automation detection
     stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
     return driver
 
-def run_agent(agent_id, cookie, target_id):
+def run_agent(agent_id, cookie, target_id, target_name):
     global_start = time.time()
     
     while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
         try:
-            print(f"🚀 [Agent {agent_id}] Pulse Shift Starting...")
+            print(f"🚀 [Agent {agent_id}] Starting 2-Min Cycle...")
             driver = get_driver()
             driver.get("https://www.instagram.com/")
             
-            # Clean sessionid from cookie string
             sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
             driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
             
-            # Ignite multiple tabs
             for _ in range(TABS_PER_THREAD):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
                 time.sleep(2)
@@ -54,34 +51,27 @@ def run_agent(agent_id, cookie, target_id):
             handles = driver.window_handles[1:]
             for handle in handles:
                 driver.switch_to.window(handle)
-                
-                # ⚡ BURST-FIRE JS ENGINE
+                # ⚡ HYPER-ENGINE WITH UPDATED BRANDING
                 driver.execute_script("""
-                    const delay = arguments[0];
+                    const name = arguments[0];
+                    const delay = arguments[1];
                     
-                    function getBlock() {
+                    function getBlock(n) {
                         const emojis = ["⭕", "🌀", "🔴", "💠", "🧿", "🔘"];
                         const emo = emojis[Math.floor(Math.random() * emojis.length)];
                         
-                        // FONT-STYLED MESSAGES (PRVR KO BAAP BANA LE)
-                        const styles = [
-                            `❮❮ ⚡ 𝐏𝐑𝐕𝐑 𝐊𝐎 𝐁𝐀𝐀𝐏 𝐁𝐀𝐍𝐀 𝐋𝐄 ⚡ ❯❯`,
-                            `▓▒░  𝗣𝗥𝗩𝗥 𝗞𝗢 𝗕𝗔𝗔𝗣 𝗕𝗔𝗡𝗔 𝗟𝗘  ░▒▓`,
-                            `╔══ 👑 𝐏𝐑𝐕𝐑 𝐊𝐎 𝐁𝐀𝐀𝐏 𝐁𝐀𝐍𝐀 𝐋𝐄 👑 ══╗`,
-                            `◢◤ 🪬 𝗣𝗥𝗩𝗥 𝗞𝗢 𝗕𝗔𝗔𝗣 𝗕𝗔𝐍𝐀 𝐋𝐄 🪬 ◥◣`
-                        ];
-                        const selectedStyle = styles[Math.floor(Math.random() * styles.length)];
-                        const line = `${selectedStyle} ~${emo}\\n`;
+                        // UPDATED BRANDING: CLEAN PILLAR ALIGNMENT
+                        const line = `(${n}) 𝚂ᴀ𝚈 【﻿ＰＲＶ𝐑】 𝐃ᴀ𝐃𝐃𝐘 ~${emo}\\n`;
                         
                         let block = "";
-                        for(let i=0; i<7; i++) { block += line; }
+                        for(let i=0; i<22; i++) { block += line; }
                         return block + "\\n⚡ ID: " + Math.random().toString(36).substring(7);
                     }
 
                     setInterval(() => {
                         const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
                         if (box) {
-                            const text = getBlock();
+                            const text = getBlock(name);
                             box.focus();
                             document.execCommand('insertText', false, text);
                             box.dispatchEvent(new Event('input', { bubbles: true }));
@@ -91,13 +81,12 @@ def run_agent(agent_id, cookie, target_id):
                             });
                             box.dispatchEvent(enter);
                             
-                            // Visual clearing for anti-lag
                             setTimeout(() => { if(box.innerHTML.length > 0) box.innerHTML = ""; }, 5);
                         }
                     }, delay);
-                """, PULSE_DELAY)
+                """, target_name, PULSE_DELAY)
 
-            print(f"🔥 [Agent {agent_id}] Waterfall Ignited (Reset in 60s)")
+            print(f"🔥 [Agent {agent_id}] Bursting PRVR DADDY... (Reset in 120s)")
             time.sleep(SESSION_MAX_SEC) 
 
         except Exception as e:
@@ -110,17 +99,18 @@ def run_agent(agent_id, cookie, target_id):
 def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
+    target_name = os.environ.get("TARGET_NAME", "TARGET")
 
     if not cookie or not target_id:
-        print("❌ Missing Secrets! Check INSTA_COOKIE and TARGET_THREAD_ID.")
+        print("❌ Missing Secrets!")
         return
 
     threads = []
     for i in range(THREADS):
-        t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id))
+        t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id, target_name))
         t.start()
         threads.append(t)
-        time.sleep(10) # Staggered startup to avoid CPU spike
+        time.sleep(10)
 
     for t in threads:
         t.join()
