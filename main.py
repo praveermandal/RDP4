@@ -8,7 +8,7 @@ from selenium_stealth import stealth
 
 # --- ⚙️ V100 TUNED SETTINGS (STABLE) ---
 THREADS = 2             
-TABS_PER_THREAD = 2     
+TABS_PER_THREAD = 2      
 PULSE_DELAY = 100       
 SESSION_MAX_SEC = 120   
 TOTAL_DURATION = 25000  
@@ -31,7 +31,7 @@ def get_driver():
     stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
     return driver
 
-def run_agent(agent_id, cookie, target_id, target_name):
+def run_agent(agent_id, cookie_raw, target_id, target_name):
     global_start = time.time()
     
     while (time.time() - global_start) < TOTAL_DURATION:
@@ -40,9 +40,20 @@ def run_agent(agent_id, cookie, target_id, target_name):
             print(f"🚀 [Agent {agent_id}] Starting 2-Min Cycle...")
             driver = get_driver()
             driver.get("https://www.instagram.com/")
+            time.sleep(3) # Small wait for initial load
             
-            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
-            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+            # --- UPDATE: COMPREHENSIVE COOKIE INJECTION ---
+            cookie_dict = {}
+            for item in cookie_raw.split(';'):
+                if '=' in item:
+                    key, value = item.strip().split('=', 1)
+                    driver.add_cookie({
+                        'name': key,
+                        'value': value,
+                        'domain': '.instagram.com',
+                        'path': '/'
+                    })
+            # ----------------------------------------------
             
             for _ in range(TABS_PER_THREAD):
                 driver.execute_script(f"window.open('https://www.instagram.com/direct/t/{target_id}/', '_blank');")
@@ -60,7 +71,6 @@ def run_agent(agent_id, cookie, target_id, target_name):
                         const emojis = ["⭕", "🌀", "🔴", "💠", "🧿", "🔘"];
                         const emo = emojis[Math.floor(Math.random() * emojis.length)];
                         
-                        // UPDATED BRANDING: CLEAN PILLAR ALIGNMENT
                         const line = `(${n}) 𝚂ᴀ𝚈 【﻿ＰＲＶ𝐑】 𝐃ᴀ𝐃𝐃𝐘 ~${emo}\\n`;
                         
                         let block = "";
