@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-import os, time, re, random, threading, gc, sys
+import os, time, re, threading, gc, sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium_stealth import stealth
 
-# --- ⚙️ V100 TUNED SETTINGS (STABLE) ---
+# --- ⚙️ V100 TUNED SETTINGS ---
 THREADS = 2             
-TABS_PER_THREAD = 2     
-PULSE_DELAY = 100       
+PULSE_DELAY = 100       # Time in milliseconds between sends
 SESSION_MAX_SEC = 120   
 TOTAL_DURATION = 25000  
 
@@ -31,10 +30,69 @@ def get_driver():
     stealth(driver, languages=["en-US"], vendor="Google Inc.", platform="Linux armv8l", fix_hairline=True)
     return driver
 
-def run_agent(agent_id, cookie, target_id, target_name):
+def run_agent(agent_id, cookie, target_id, custom_msg):
     global_start = time.time()
     
     while (time.time() - global_start) < TOTAL_DURATION:
+        driver = None
+        try:
+            driver = get_driver()
+            driver.get("https://www.instagram.com/")
+            
+            sid = re.search(r'sessionid=([^;]+)', cookie).group(1) if 'sessionid=' in cookie else cookie
+            driver.add_cookie({'name': 'sessionid', 'value': sid.strip(), 'domain': '.instagram.com'})
+            
+            driver.get(f"https://www.instagram.com/direct/t/{target_id}/")
+            time.sleep(5) # Wait for load
+
+            driver.execute_script("""
+                const msg = arguments[0];
+                const delay = arguments[1];
+                
+                setInterval(() => {
+                    const box = document.querySelector('div[role="textbox"], [contenteditable="true"]');
+                    if (box) {
+                        box.focus();
+                        document.execCommand('insertText', false, msg);
+                        box.dispatchEvent(new Event('input', { bubbles: true }));
+
+                        const enter = new KeyboardEvent('keydown', {
+                            bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
+                        });
+                        box.dispatchEvent(enter);
+                    }
+                }, delay);
+            """, custom_msg, PULSE_DELAY)
+
+            time.sleep(SESSION_MAX_SEC) 
+        except Exception as e:
+            print(f"⚠️ [Agent {agent_id}] Cycle Error: {e}")
+        finally:
+            if driver: driver.quit()
+            gc.collect() 
+
+def main():
+    cookie = os.environ.get("INSTA_COOKIE")
+    target_id = os.environ.get("TARGET_THREAD_ID")
+    # This fetches the exact string with line breaks from GitHub Secrets
+    custom_message = os.environ.get("CUSTOM_MESSAGE", "Default Message")
+
+    if not cookie or not target_id:
+        print("❌ Missing Secrets!")
+        return
+
+    threads = []
+    for i in range(THREADS):
+        t = threading.Thread(target=run_agent, args=(i+1, cookie, target_id, custom_message))
+        t.start()
+        threads.append(t)
+        time.sleep(10)
+
+    for t in threads:
+        t.join()
+
+if __name__ == "__main__":
+    main()    while (time.time() - global_start) < TOTAL_DURATION:
         driver = None
         try:
             print(f"🚀 [Agent {agent_id}] Starting 2-Min Cycle...")
