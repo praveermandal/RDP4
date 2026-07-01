@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import os, time, re, threading, gc, sys
+import os, time, re, threading, gc, sys, base64
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -80,7 +80,13 @@ def run_agent(agent_id, cookie, target_id, custom_msg):
 def main():
     cookie = os.environ.get("INSTA_COOKIE")
     target_id = os.environ.get("TARGET_THREAD_ID")
-    custom_msg = os.environ.get("CUSTOM_MESSAGE", "Default Message")
+    encoded_msg = os.environ.get("CUSTOM_MESSAGE", "")
+
+    # Decode Base64 string to handle newlines correctly
+    try:
+        custom_msg = base64.b64decode(encoded_msg).decode('utf-8')
+    except Exception:
+        custom_msg = "Error: Check Base64 format in Secret"
 
     if not cookie or not target_id:
         print("❌ Missing Secrets!")
